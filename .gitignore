@@ -4,6 +4,7 @@ node_modules/
 .env.local
 dist/
 build/
+supabase/.temp/
 data/*.xlsx
 data/*.xls
 data/*.csv
