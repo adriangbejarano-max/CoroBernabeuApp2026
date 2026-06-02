@@ -22,6 +22,11 @@ const seedState = {
     dni: "",
     name: "",
   },
+  adminFilters: {
+    category: "",
+    source: "",
+    createdDate: "",
+  },
   users: [
     {
       id: "admin-1",
@@ -68,6 +73,8 @@ const seedState = {
       email: "",
       birthDate: "",
       accreditation: "GRADA",
+      source: "manual",
+      createdAt: "2026-06-02T00:00:00.000Z",
       phone: "600 111 222",
       notes: "Coro parroquial San Juan",
       checkins: {},
@@ -81,6 +88,8 @@ const seedState = {
       email: "",
       birthDate: "",
       accreditation: "ZONA CERO",
+      source: "manual",
+      createdAt: "2026-06-02T00:00:00.000Z",
       phone: "600 222 333",
       notes: "Entrada con grupo de danza",
       checkins: {},
@@ -94,6 +103,8 @@ const seedState = {
       email: "",
       birthDate: "",
       accreditation: "GRADA",
+      source: "manual",
+      createdAt: "2026-06-02T00:00:00.000Z",
       phone: "600 333 444",
       notes: "Madre de Pablo y Clara",
       checkins: {},
@@ -107,6 +118,8 @@ const seedState = {
       email: "",
       birthDate: "",
       accreditation: "GRADA",
+      source: "manual",
+      createdAt: "2026-06-02T00:00:00.000Z",
       phone: "600 333 444",
       notes: "Menor asociado al DNI familiar",
       checkins: {},
@@ -120,6 +133,8 @@ const seedState = {
       email: "",
       birthDate: "",
       accreditation: "GRADA",
+      source: "manual",
+      createdAt: "2026-06-02T00:00:00.000Z",
       phone: "600 333 444",
       notes: "Menor asociado al DNI familiar",
       checkins: {},
@@ -133,6 +148,8 @@ const seedState = {
       email: "",
       birthDate: "",
       accreditation: "ZONA CERO",
+      source: "manual",
+      createdAt: "2026-06-02T00:00:00.000Z",
       phone: "600 444 555",
       notes: "Violin",
       checkins: {},
@@ -146,6 +163,8 @@ const seedState = {
       email: "",
       birthDate: "",
       accreditation: "ZONA CERO",
+      source: "manual",
+      createdAt: "2026-06-02T00:00:00.000Z",
       phone: "600 555 666",
       notes: "Coordinacion de backstage",
       checkins: {},
@@ -162,12 +181,26 @@ let cloudError = "";
 
 function loadState() {
   const saved = localStorage.getItem(STORAGE_KEY);
-  if (!saved) return structuredClone(seedState);
+  if (!saved) return normalizeState(structuredClone(seedState));
   try {
-    return { ...structuredClone(seedState), ...JSON.parse(saved) };
+    return normalizeState({ ...structuredClone(seedState), ...JSON.parse(saved) });
   } catch {
-    return structuredClone(seedState);
+    return normalizeState(structuredClone(seedState));
   }
+}
+
+function normalizeState(nextState) {
+  nextState.search = { ...seedState.search, ...(nextState.search || {}) };
+  nextState.adminFilters = { ...seedState.adminFilters, ...(nextState.adminFilters || {}) };
+  nextState.attendees = (nextState.attendees || []).map((person) => ({
+    email: "",
+    birthDate: "",
+    accreditation: "",
+    source: "manual",
+    createdAt: new Date().toISOString(),
+    ...person,
+  }));
+  return nextState;
 }
 
 function saveState() {
@@ -270,6 +303,8 @@ async function loadCloudData() {
     email: person.email || "",
     birthDate: person.birth_date || "",
     accreditation: person.accreditation || "",
+    source: person.source || "manual",
+    createdAt: person.created_at,
     phone: person.phone,
     notes: person.notes,
     checkins: checkinsByAttendee[person.id] || {},
@@ -328,6 +363,35 @@ function escapeHtml(value) {
     .replaceAll("'", "&#039;");
 }
 
+function isMinor(birthDate) {
+  if (!birthDate) return false;
+  const birth = new Date(`${birthDate}T00:00:00`);
+  if (Number.isNaN(birth.getTime())) return false;
+  const today = new Date();
+  let age = today.getFullYear() - birth.getFullYear();
+  const monthDiff = today.getMonth() - birth.getMonth();
+  if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birth.getDate())) age -= 1;
+  return age < 18;
+}
+
+function formatDate(value) {
+  if (!value) return "";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "";
+  return date.toLocaleDateString("es-ES", { day: "2-digit", month: "2-digit", year: "numeric" });
+}
+
+function dateInputValue(value) {
+  if (!value) return "";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "";
+  return date.toISOString().slice(0, 10);
+}
+
+function hasActiveSearch() {
+  return Boolean(normalize(state.search.dni) || normalize(state.search.name));
+}
+
 function showToast(message) {
   const toast = byId("toast");
   if (!toast) return;
@@ -382,6 +446,8 @@ function renderLogin() {
 }
 
 function renderApp(user) {
+  if (user.role === "volunteer") return renderVolunteerApp(user);
+
   const adminTabs =
     user.role === "admin"
       ? `
@@ -424,6 +490,34 @@ function renderApp(user) {
           ${renderActiveView(user)}
         </section>
       </div>
+      <div class="toast" id="toast"></div>
+    </main>
+  `;
+}
+
+function renderVolunteerApp(user) {
+  return `
+    <main class="app-shell volunteer-shell">
+      <header class="topbar volunteer-topbar">
+        <div class="topbar-brand">
+          <div class="mini-crest">CB</div>
+          <div>
+            <strong>Check-in</strong>
+            <span>Visita Papa Leon XIV Madrid 2026</span>
+          </div>
+        </div>
+        <div class="top-actions">
+          <div class="user-box">
+            <strong>${escapeHtml(user.name)}</strong>
+            <span>Voluntario/a</span>
+          </div>
+          <button class="btn ghost" id="logoutBtn" type="button">Salir</button>
+        </div>
+      </header>
+      <section class="volunteer-content">
+        ${renderEventStrip()}
+        ${renderCheckin()}
+      </section>
       <div class="toast" id="toast"></div>
     </main>
   `;
@@ -507,7 +601,7 @@ function renderCheckin() {
       <div class="panel-title">
         <div>
           <h2>Check-in de asistentes</h2>
-          <p>Busca por DNI o por nombre completo. Si un DNI tiene varios perfiles, apareceran todos.</p>
+          <p>Introduce un DNI o un nombre completo para ver asistentes y marcar el check-in.</p>
         </div>
       </div>
       <div class="search-grid">
@@ -520,7 +614,7 @@ function renderCheckin() {
           <input id="nameSearch" placeholder="Nombre y apellidos" value="${escapeHtml(state.search.name)}" />
         </label>
       </div>
-      <div class="hint">Evento: ${escapeHtml(event.name)}. Los cambios se guardan automaticamente en este navegador.</div>
+      <div class="hint">Evento: ${escapeHtml(event.name)}. Si un DNI tiene varios perfiles, apareceran todos.</div>
     </section>
     <section class="result-list" id="results">${renderResults(results)}</section>
   `;
@@ -539,10 +633,13 @@ function getSearchResults() {
     results = results.filter((person) => terms.every((term) => normalize(person.fullName).includes(term)));
   }
 
-  return dni || name ? results : results.slice(0, 6);
+  return dni || name ? results : [];
 }
 
 function renderResults(results) {
+  if (!hasActiveSearch()) {
+    return `<div class="empty-state search-empty"><strong>Busca un asistente para empezar</strong><span>Usa el DNI para ir rapido o el nombre completo si necesitas una busqueda avanzada.</span></div>`;
+  }
   if (!results.length) {
     return `<div class="empty-state">No hay asistentes que coincidan con la busqueda.</div>`;
   }
@@ -559,6 +656,7 @@ function renderPersonCard(person) {
         <h3 class="person-name">${escapeHtml(person.fullName)}</h3>
         <div class="person-meta">
           <span class="badge category">${escapeHtml(person.category)}</span>
+          ${isMinor(person.birthDate) ? `<span class="badge minor">MENOR DE EDAD</span>` : ""}
           ${person.accreditation ? `<span class="badge">${escapeHtml(person.accreditation)}</span>` : ""}
           <span>DNI ${escapeHtml(person.dni)}</span>
           <span>${escapeHtml(person.group)}</span>
@@ -568,7 +666,7 @@ function renderPersonCard(person) {
       </div>
       <div class="card-actions">
         <button class="btn ${checked ? "ghost" : "primary"}" data-checkin="${person.id}" type="button">
-          ${checked ? "Desmarcar" : "Marcar"}
+          ${checked ? "Desmarcar CHECK-IN" : "Marcar CHECK-IN"}
         </button>
       </div>
     </article>
@@ -577,6 +675,7 @@ function renderPersonCard(person) {
 
 function renderAttendeesAdmin() {
   const editing = state.attendees.find((person) => person.id === editingAttendeeId);
+  const filteredAttendees = getFilteredAdminAttendees();
   const values = editing || {
     fullName: "",
     dni: "",
@@ -585,6 +684,7 @@ function renderAttendeesAdmin() {
     email: "",
     birthDate: "",
     accreditation: "",
+    source: "manual",
     phone: "",
     notes: "",
   };
@@ -617,19 +717,51 @@ function renderAttendeesAdmin() {
         <div class="panel-title">
           <div>
             <h2>Asistentes</h2>
-            <p>${state.attendees.length} fichas registradas.</p>
+            <p>${filteredAttendees.length} de ${state.attendees.length} fichas visibles.</p>
           </div>
+        </div>
+        <div class="filters-grid">
+          <label class="field">
+            <span>Categoria</span>
+            <select id="adminCategoryFilter">
+              <option value="">Todas</option>
+              ${Object.keys(categoryColors)
+                .map((category) => `<option value="${category}" ${state.adminFilters.category === category ? "selected" : ""}>${category}</option>`)
+                .join("")}
+            </select>
+          </label>
+          <label class="field">
+            <span>Origen</span>
+            <select id="adminSourceFilter">
+              <option value="">Todos</option>
+              <option value="excel" ${state.adminFilters.source === "excel" ? "selected" : ""}>Excel</option>
+              <option value="manual" ${state.adminFilters.source === "manual" ? "selected" : ""}>Manual</option>
+            </select>
+          </label>
+          <label class="field">
+            <span>Creado el dia</span>
+            <input id="adminCreatedDateFilter" type="date" value="${escapeHtml(state.adminFilters.createdDate)}" />
+          </label>
         </div>
         <div class="import-box">
           <strong>Importacion del Excel</strong>
           <span class="muted">Cuando tengas el archivo definitivo, se mapearan columnas como DNI, nombre, categoria, grupo, telefono y notas. Esta primera version ya admite el modelo de datos.</span>
         </div>
         <div class="admin-list">
-          ${state.attendees.map(renderAdminAttendee).join("")}
+          ${filteredAttendees.length ? filteredAttendees.map(renderAdminAttendee).join("") : `<div class="empty-state">No hay asistentes con esos filtros.</div>`}
         </div>
       </section>
     </section>
   `;
+}
+
+function getFilteredAdminAttendees() {
+  return state.attendees.filter((person) => {
+    if (state.adminFilters.category && person.category !== state.adminFilters.category) return false;
+    if (state.adminFilters.source && (person.source || "manual") !== state.adminFilters.source) return false;
+    if (state.adminFilters.createdDate && dateInputValue(person.createdAt) !== state.adminFilters.createdDate) return false;
+    return true;
+  });
 }
 
 function renderCategorySelect(selected) {
@@ -647,8 +779,9 @@ function renderAdminAttendee(person) {
   return `
     <article class="admin-item" style="--category-color:${color}">
       <div>
-        <h3>${escapeHtml(person.fullName)} <span class="badge category">${escapeHtml(person.category)}</span></h3>
+        <h3>${escapeHtml(person.fullName)} <span class="badge category">${escapeHtml(person.category)}</span> ${isMinor(person.birthDate) ? `<span class="badge minor">MENOR DE EDAD</span>` : ""}</h3>
         <p class="muted">DNI ${escapeHtml(person.dni)} · ${escapeHtml(person.group || "Sin grupo")} · ${escapeHtml(person.accreditation || "Sin acreditacion")}</p>
+        <p class="muted">Origen: ${person.source === "excel" ? "Excel" : "Manual"} · Creado: ${escapeHtml(formatDate(person.createdAt) || "Sin fecha")}</p>
       </div>
       <div class="card-actions">
         <button class="btn ghost" data-edit-attendee="${person.id}" type="button">Editar</button>
@@ -773,6 +906,9 @@ function bindEvents() {
   byId("attendeeForm")?.addEventListener("submit", handleAttendeeSave);
   byId("userForm")?.addEventListener("submit", handleUserSave);
   byId("eventForm")?.addEventListener("submit", handleEventSave);
+  byId("adminCategoryFilter")?.addEventListener("change", updateAdminFilters);
+  byId("adminSourceFilter")?.addEventListener("change", updateAdminFilters);
+  byId("adminCreatedDateFilter")?.addEventListener("change", updateAdminFilters);
   byId("cancelEditBtn")?.addEventListener("click", () => {
     editingAttendeeId = null;
     render();
@@ -796,6 +932,14 @@ function bindEvents() {
   document.querySelectorAll("[data-delete-event]").forEach((button) => {
     button.addEventListener("click", () => deleteEvent(button.dataset.deleteEvent));
   });
+}
+
+function updateAdminFilters() {
+  state.adminFilters.category = byId("adminCategoryFilter")?.value || "";
+  state.adminFilters.source = byId("adminSourceFilter")?.value || "";
+  state.adminFilters.createdDate = byId("adminCreatedDateFilter")?.value || "";
+  saveState();
+  render();
 }
 
 async function handleLogin(event) {
@@ -926,7 +1070,7 @@ async function handleAttendeeSave(event) {
     }
     showToast("Ficha actualizada.");
   } else {
-    const newAttendee = { id: crypto.randomUUID(), ...payload, checkins: {} };
+    const newAttendee = { id: crypto.randomUUID(), ...payload, source: "manual", createdAt: new Date().toISOString(), checkins: {} };
     state.attendees.unshift(newAttendee);
     if (isCloudUser()) {
       await supabaseRequest("/rest/v1/attendees", {
@@ -958,7 +1102,7 @@ async function deleteAttendee(id) {
 }
 
 function toCloudAttendee(person) {
-  return {
+  const payload = {
     dni: person.dni,
     full_name: person.fullName,
     category: person.category,
@@ -969,6 +1113,8 @@ function toCloudAttendee(person) {
     phone: person.phone,
     notes: person.notes,
   };
+  if (person.source) payload.source = person.source;
+  return payload;
 }
 
 async function handleUserSave(event) {

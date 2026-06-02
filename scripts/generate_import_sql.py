@@ -63,7 +63,7 @@ def main():
         "-- Generado desde data/asistentes.xlsx",
         "-- Ejecuta primero supabase-schema.sql.",
         "begin;",
-        "insert into public.attendees (id, dni, full_name, category, group_name, email, birth_date, accreditation, phone, notes)",
+        "insert into public.attendees (id, dni, full_name, category, group_name, email, birth_date, accreditation, source, phone, notes)",
         "values",
     ]
 
@@ -89,6 +89,7 @@ def main():
                     sql(row.get("CORREO ELECTRÓNICO")),
                     sql_date(row.get("FECHA DE NACIMIENTO")),
                     sql(row.get("ACREDITACIÓN")),
+                    sql("excel"),
                     sql(row.get("TELÉFONO MÓVIL")),
                     sql(notes),
                 ]
@@ -107,6 +108,7 @@ def main():
             "  email = excluded.email,",
             "  birth_date = excluded.birth_date,",
             "  accreditation = excluded.accreditation,",
+            "  source = excluded.source,",
             "  phone = excluded.phone,",
             "  notes = excluded.notes;",
             "commit;",

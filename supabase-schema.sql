@@ -25,6 +25,7 @@ create table if not exists public.attendees (
   email text not null default '',
   birth_date date,
   accreditation text not null default '',
+  source text not null default 'manual' check (source in ('manual', 'excel')),
   phone text not null default '',
   notes text not null default '',
   created_at timestamptz not null default now()
@@ -33,6 +34,7 @@ create table if not exists public.attendees (
 alter table public.attendees add column if not exists email text not null default '';
 alter table public.attendees add column if not exists birth_date date;
 alter table public.attendees add column if not exists accreditation text not null default '';
+alter table public.attendees add column if not exists source text not null default 'manual';
 
 create table if not exists public.checkins (
   id uuid primary key default gen_random_uuid(),

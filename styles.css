@@ -394,6 +394,18 @@ textarea:focus {
   min-width: 0;
 }
 
+.volunteer-content {
+  width: min(100%, 980px);
+  margin: 0 auto;
+  display: grid;
+  gap: 18px;
+  padding: 22px clamp(16px, 4vw, 34px) 34px;
+}
+
+.volunteer-shell .panel {
+  border-top: 6px solid var(--accent);
+}
+
 .event-strip {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
@@ -440,6 +452,13 @@ textarea:focus {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(0, 1.25fr);
   gap: 14px;
+}
+
+.filters-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 0.8fr) minmax(0, 0.8fr);
+  gap: 12px;
+  margin-bottom: 14px;
 }
 
 .result-list {
@@ -491,6 +510,11 @@ textarea:focus {
 .badge.checked {
   color: #fff;
   background: linear-gradient(135deg, var(--success), var(--mint));
+}
+
+.badge.minor {
+  color: #fff;
+  background: linear-gradient(135deg, var(--coral), var(--violet));
 }
 
 .badge.category {
@@ -554,6 +578,16 @@ textarea:focus {
   color: var(--muted);
 }
 
+.search-empty {
+  display: grid;
+  gap: 6px;
+}
+
+.search-empty strong {
+  color: var(--ink);
+  font-size: 18px;
+}
+
 .toast {
   position: fixed;
   right: 18px;
@@ -584,6 +618,7 @@ textarea:focus {
   .layout,
   .admin-grid,
   .search-grid,
+  .filters-grid,
   .event-strip {
     grid-template-columns: 1fr;
   }
