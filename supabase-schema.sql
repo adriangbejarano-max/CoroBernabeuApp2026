@@ -45,6 +45,12 @@ create table if not exists public.checkins (
   unique(attendee_id, event_id)
 );
 
+create table if not exists public.app_settings (
+  key text primary key,
+  value text not null default '',
+  updated_at timestamptz not null default now()
+);
+
 create or replace function public.is_admin()
 returns boolean
 language sql
@@ -63,6 +69,7 @@ alter table public.profiles enable row level security;
 alter table public.events enable row level security;
 alter table public.attendees enable row level security;
 alter table public.checkins enable row level security;
+alter table public.app_settings enable row level security;
 
 drop policy if exists "profiles_select" on public.profiles;
 create policy "profiles_select"
@@ -133,6 +140,19 @@ on public.checkins for delete
 to authenticated
 using (true);
 
+drop policy if exists "app_settings_select_authenticated" on public.app_settings;
+create policy "app_settings_select_authenticated"
+on public.app_settings for select
+to authenticated
+using (true);
+
+drop policy if exists "app_settings_write_admin" on public.app_settings;
+create policy "app_settings_write_admin"
+on public.app_settings for all
+to authenticated
+using (public.is_admin())
+with check (public.is_admin());
+
 insert into public.events (id, name, event_date, location)
 values
   ('00000000-0000-4000-8000-000000000001', 'Encuentro Coral Santiago Bernabeu', '2026-06-14', 'Estadio Santiago Bernabeu'),
@@ -150,3 +170,8 @@ where id in (
   '00000000-0000-4000-8000-000000000106',
   '00000000-0000-4000-8000-000000000107'
 );
+
+update public.attendees
+set source = 'excel'
+where source = 'manual'
+  and notes like 'Cargo original:%';

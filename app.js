@@ -262,11 +262,12 @@ async function signInWithSupabase(email, password) {
 
 async function loadCloudData() {
   if (!supabaseEnabled || !cloudSession?.access_token) return false;
-  const [profiles, events, attendees, checkins] = await Promise.all([
+  const [profiles, events, attendees, checkins, settings] = await Promise.all([
     supabaseRequest("/rest/v1/profiles?select=*&order=created_at.asc"),
     supabaseRequest("/rest/v1/events?select=*&order=event_date.asc"),
     supabaseRequest("/rest/v1/attendees?select=*&order=full_name.asc"),
     supabaseRequest("/rest/v1/checkins?select=*"),
+    supabaseRequest("/rest/v1/app_settings?select=key,value&key=eq.active_event_id"),
   ]);
 
   const checkinsByAttendee = checkins.reduce((acc, row) => {
@@ -309,9 +310,8 @@ async function loadCloudData() {
     notes: person.notes,
     checkins: checkinsByAttendee[person.id] || {},
   }));
-  if (!state.events.some((event) => event.id === state.activeEventId)) {
-    state.activeEventId = state.events[0]?.id || "";
-  }
+  const activeSetting = settings.find((setting) => setting.key === "active_event_id");
+  state.activeEventId = activeSetting?.value || "";
   cloudReady = true;
   cloudError = "";
   saveState();
@@ -343,7 +343,7 @@ function currentUser() {
 }
 
 function activeEvent() {
-  return state.events.find((event) => event.id === state.activeEventId) || state.events[0];
+  return state.events.find((event) => event.id === state.activeEventId) || null;
 }
 
 function normalize(value) {
@@ -515,7 +515,7 @@ function renderVolunteerApp(user) {
         </div>
       </header>
       <section class="volunteer-content">
-        ${renderEventStrip()}
+        ${renderVolunteerEventStatus()}
         ${renderCheckin()}
       </section>
       <div class="toast" id="toast"></div>
@@ -530,14 +530,36 @@ function renderEventStrip() {
       <label class="field">
         <span>Evento activo</span>
         <select id="eventSelect">
+          <option value="" ${event ? "" : "selected"}>Sin evento activo</option>
           ${state.events
             .map(
               (item) =>
-                `<option value="${item.id}" ${item.id === event.id ? "selected" : ""}>${escapeHtml(item.name)} - ${escapeHtml(item.date)}</option>`,
+                `<option value="${item.id}" ${item.id === event?.id ? "selected" : ""}>${escapeHtml(item.name)} - ${escapeHtml(item.date)}</option>`,
             )
             .join("")}
         </select>
       </label>
+      <div class="badge">${event ? escapeHtml(event.location) : "Los voluntarios no podran hacer check-in"}</div>
+    </section>
+  `;
+}
+
+function renderVolunteerEventStatus() {
+  const event = activeEvent();
+  if (!event) {
+    return `
+      <section class="empty-state no-event-state">
+        <strong>PIDELE A TU ADMIN QUE ACTIVE UN EVENTO</strong>
+        <span>Cuando haya un evento activo, podras empezar a registrar check-ins.</span>
+      </section>
+    `;
+  }
+  return `
+    <section class="event-strip readonly-event">
+      <div>
+        <span class="muted">Evento activo</span>
+        <strong>${escapeHtml(event.name)}</strong>
+      </div>
       <div class="badge">${escapeHtml(event.location)}</div>
     </section>
   `;
@@ -553,7 +575,7 @@ function renderActiveView(user) {
 
 function renderDashboard() {
   const event = activeEvent();
-  const checked = state.attendees.filter((person) => person.checkins[event.id]).length;
+  const checked = event ? state.attendees.filter((person) => person.checkins[event.id]).length : 0;
   const total = state.attendees.length;
   const categories = Object.keys(categoryColors);
 
@@ -568,7 +590,7 @@ function renderDashboard() {
       <div class="panel-title">
         <div>
           <h2>Resumen por categoria</h2>
-          <p>${escapeHtml(event.name)}</p>
+          <p>${event ? escapeHtml(event.name) : "Sin evento activo"}</p>
         </div>
       </div>
       <div class="admin-list">
@@ -576,7 +598,7 @@ function renderDashboard() {
           .map((category) => {
             const people = state.attendees.filter((person) => person.category === category);
             if (!people.length) return "";
-            const categoryChecked = people.filter((person) => person.checkins[event.id]).length;
+            const categoryChecked = event ? people.filter((person) => person.checkins[event.id]).length : 0;
             return `
               <div class="admin-item" style="--category-color:${categoryColors[category]}">
                 <div>
@@ -595,6 +617,14 @@ function renderDashboard() {
 
 function renderCheckin() {
   const event = activeEvent();
+  if (!event) {
+    return `
+      <section class="empty-state no-event-state">
+        <strong>PIDELE A TU ADMIN QUE ACTIVE UN EVENTO</strong>
+        <span>No hay un evento activo para registrar check-ins.</span>
+      </section>
+    `;
+  }
   const results = getSearchResults();
   return `
     <section class="panel">
@@ -648,6 +678,7 @@ function renderResults(results) {
 
 function renderPersonCard(person) {
   const event = activeEvent();
+  if (!event) return "";
   const checked = person.checkins[event.id];
   const color = categoryColors[person.category] || categoryColors.Staff;
   return `
@@ -887,9 +918,13 @@ function renderEventsAdmin() {
 function bindEvents() {
   byId("loginForm")?.addEventListener("submit", handleLogin);
   byId("logoutBtn")?.addEventListener("click", handleLogout);
-  byId("eventSelect")?.addEventListener("change", (event) => {
+  byId("eventSelect")?.addEventListener("change", async (event) => {
     state.activeEventId = event.target.value;
     saveState();
+    if (isCloudUser() && currentUser()?.role === "admin") {
+      await saveActiveEventSetting(state.activeEventId);
+      await tryCloudSync();
+    }
     render();
   });
 
@@ -931,6 +966,14 @@ function bindEvents() {
   });
   document.querySelectorAll("[data-delete-event]").forEach((button) => {
     button.addEventListener("click", () => deleteEvent(button.dataset.deleteEvent));
+  });
+}
+
+async function saveActiveEventSetting(eventId) {
+  await supabaseRequest("/rest/v1/app_settings?on_conflict=key", {
+    method: "POST",
+    headers: { Prefer: "resolution=merge-duplicates,return=minimal" },
+    body: JSON.stringify({ key: "active_event_id", value: eventId || "" }),
   });
 }
 
@@ -1000,6 +1043,10 @@ async function toggleCheckin(attendeeId) {
   const person = state.attendees.find((item) => item.id === attendeeId);
   if (!person) return;
   const event = activeEvent();
+  if (!event) {
+    showToast("No hay evento activo.");
+    return;
+  }
   if (person.checkins[event.id]) {
     delete person.checkins[event.id];
     if (isCloudUser()) {
@@ -1196,7 +1243,6 @@ async function handleEventSave(event) {
     location: String(form.get("location") || "").trim(),
   };
   state.events.push(newEvent);
-  state.activeEventId = newEvent.id;
   if (isCloudUser()) {
     await supabaseRequest("/rest/v1/events", {
       method: "POST",
@@ -1219,7 +1265,10 @@ async function deleteEvent(id) {
   if (state.events.length === 1) return;
   state.events = state.events.filter((event) => event.id !== id);
   state.attendees.forEach((person) => delete person.checkins[id]);
-  if (state.activeEventId === id) state.activeEventId = state.events[0].id;
+  if (state.activeEventId === id) {
+    state.activeEventId = "";
+    if (isCloudUser()) await saveActiveEventSetting("");
+  }
   if (isCloudUser()) {
     await supabaseRequest(`/rest/v1/events?id=eq.${encodeURIComponent(id)}`, {
       method: "DELETE",

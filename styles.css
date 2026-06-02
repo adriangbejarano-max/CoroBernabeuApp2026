@@ -406,6 +406,21 @@ textarea:focus {
   border-top: 6px solid var(--accent);
 }
 
+.readonly-event {
+  padding: 14px;
+  background: #fff;
+  border: 1px solid var(--line);
+  border-left: 6px solid var(--mint);
+  border-radius: var(--radius);
+  box-shadow: 0 12px 34px rgba(23, 32, 51, 0.07);
+}
+
+.readonly-event strong {
+  display: block;
+  margin-top: 4px;
+  font-size: 18px;
+}
+
 .event-strip {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
@@ -586,6 +601,17 @@ textarea:focus {
 .search-empty strong {
   color: var(--ink);
   font-size: 18px;
+}
+
+.no-event-state {
+  display: grid;
+  gap: 8px;
+  border-top: 6px solid var(--coral);
+}
+
+.no-event-state strong {
+  color: var(--danger);
+  font-size: clamp(20px, 4vw, 28px);
 }
 
 .toast {
