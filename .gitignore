@@ -9,3 +9,4 @@ data/*.xlsx
 data/*.xls
 data/*.csv
 data/import-attendees.sql
+.vercel

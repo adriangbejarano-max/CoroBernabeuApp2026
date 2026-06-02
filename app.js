@@ -347,17 +347,24 @@ function renderLogin() {
   return `
     <main class="login-screen">
       <section class="brand-panel">
-        <div class="crest">CB</div>
+        <div class="crest">♪</div>
         <div class="brand-copy">
+          <span class="login-kicker">Madrid 2026</span>
           <h1>Visita Papa Leon XIV Madrid 2026</h1>
-          <p>Gestion de accesos para el equipo participante en el encuentro del Santiago Bernabeu.</p>
+          <p>Un acceso rapido para acompanar con orden, alegria y ritmo el encuentro del Santiago Bernabeu.</p>
+          <div class="music-notes" aria-hidden="true">
+            <span>♪</span>
+            <span>♫</span>
+            <span>♬</span>
+          </div>
         </div>
-        <p class="muted">Check-in de asistentes y acreditaciones</p>
+        <p class="muted">Check-in de asistentes, coros y equipos</p>
       </section>
       <section class="login-panel">
         <form class="login-card" id="loginForm">
-          <h2>Acceso</h2>
-          <p>Introduce tus credenciales para continuar.</p>
+          <div class="login-icon" aria-hidden="true">♫</div>
+          <h2>Hola, voluntario/a</h2>
+          <p>Accede para comenzar el check-in.</p>
           <label class="field">
             <span>Email</span>
             <input name="email" type="email" autocomplete="email" required />

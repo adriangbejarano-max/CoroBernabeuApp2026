@@ -53,13 +53,15 @@ button {
   display: grid;
   grid-template-columns: minmax(0, 1.05fr) minmax(340px, 0.75fr);
   background:
-    linear-gradient(120deg, rgba(8, 106, 134, 0.86), rgba(255, 90, 95, 0.72) 58%, rgba(255, 183, 3, 0.76)),
-    url("data:image/svg+xml,%3Csvg width='1200' height='900' viewBox='0 0 1200 900' xmlns='http://www.w3.org/2000/svg'%3E%3Crect width='1200' height='900' fill='%23f6fbff'/%3E%3Cg fill='none' stroke='%23ffffff' stroke-opacity='.72' stroke-width='2'%3E%3Cellipse cx='600' cy='520' rx='500' ry='235'/%3E%3Cellipse cx='600' cy='520' rx='380' ry='170'/%3E%3Cpath d='M100 520h1000M250 360h700M250 640h700M600 285v470'/%3E%3C/g%3E%3Cg fill-opacity='.42'%3E%3Cpath fill='%230f8fb3' d='M140 170h210v22H140zM910 225h155v22H910z'/%3E%3Cpath fill='%23ff5a5f' d='M250 710h260v26H250z'/%3E%3Cpath fill='%23ffb703' d='M740 670h270v26H740z'/%3E%3C/g%3E%3C/svg%3E");
+    linear-gradient(120deg, rgba(8, 106, 134, 0.88), rgba(124, 77, 255, 0.66) 42%, rgba(255, 90, 95, 0.76) 70%, rgba(255, 183, 3, 0.8)),
+    url("data:image/svg+xml,%3Csvg width='1200' height='900' viewBox='0 0 1200 900' xmlns='http://www.w3.org/2000/svg'%3E%3Crect width='1200' height='900' fill='%23f6fbff'/%3E%3Cg fill='none' stroke='%23ffffff' stroke-opacity='.7' stroke-width='2'%3E%3Cellipse cx='600' cy='520' rx='500' ry='235'/%3E%3Cellipse cx='600' cy='520' rx='380' ry='170'/%3E%3Cpath d='M100 520h1000M250 360h700M250 640h700M600 285v470'/%3E%3Cpath d='M145 165c120 35 215 35 335 0s215-35 335 0 215 35 335 0'/%3E%3Cpath d='M110 235c130 30 240 30 370 0s240-30 370 0 220 30 340 0'/%3E%3C/g%3E%3Cg font-family='Arial' font-size='72' font-weight='700' fill='%23ffffff' fill-opacity='.38'%3E%3Ctext x='165' y='290'%3E%E2%99%AA%3C/text%3E%3Ctext x='920' y='330'%3E%E2%99%AB%3C/text%3E%3Ctext x='760' y='735'%3E%E2%99%AC%3C/text%3E%3C/g%3E%3Cg fill-opacity='.42'%3E%3Cpath fill='%230f8fb3' d='M140 170h210v22H140zM910 225h155v22H910z'/%3E%3Cpath fill='%23ff5a5f' d='M250 710h260v26H250z'/%3E%3Cpath fill='%23ffb703' d='M740 670h270v26H740z'/%3E%3C/g%3E%3C/svg%3E");
   background-size: cover;
   background-position: center;
 }
 
 .brand-panel {
+  position: relative;
+  overflow: hidden;
   min-height: 100%;
   display: flex;
   flex-direction: column;
@@ -68,20 +70,49 @@ button {
   color: white;
 }
 
+.brand-panel::after {
+  content: "♫";
+  position: absolute;
+  right: clamp(20px, 6vw, 84px);
+  bottom: clamp(36px, 8vw, 96px);
+  color: rgba(255, 255, 255, 0.14);
+  font-size: clamp(120px, 22vw, 260px);
+  font-weight: 900;
+  line-height: 1;
+  pointer-events: none;
+}
+
 .crest {
-  width: 56px;
-  height: 56px;
+  width: 62px;
+  height: 62px;
   display: grid;
   place-items: center;
   border: 2px solid rgba(255, 255, 255, 0.62);
-  background: rgba(255, 255, 255, 0.18);
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.28), rgba(255, 255, 255, 0.12));
   border-radius: 50%;
   font-weight: 800;
+  font-size: 30px;
   letter-spacing: 0;
+  box-shadow: 0 18px 38px rgba(23, 32, 51, 0.18);
 }
 
 .brand-copy {
+  position: relative;
+  z-index: 1;
   max-width: 720px;
+}
+
+.login-kicker {
+  display: inline-flex;
+  align-items: center;
+  min-height: 30px;
+  margin-bottom: 18px;
+  padding: 5px 11px;
+  color: #173047;
+  background: rgba(255, 255, 255, 0.82);
+  border-radius: 999px;
+  font-weight: 900;
+  font-size: 13px;
 }
 
 .brand-copy h1 {
@@ -99,7 +130,37 @@ button {
 }
 
 .brand-panel .muted {
+  position: relative;
+  z-index: 1;
   color: rgba(255, 255, 255, 0.78);
+}
+
+.music-notes {
+  display: flex;
+  gap: 12px;
+  margin-top: 26px;
+}
+
+.music-notes span,
+.login-icon {
+  display: grid;
+  place-items: center;
+  width: 42px;
+  height: 42px;
+  color: #172033;
+  background: #fff;
+  border-radius: 50%;
+  font-size: 21px;
+  font-weight: 900;
+  box-shadow: 0 12px 28px rgba(23, 32, 51, 0.16);
+}
+
+.music-notes span:nth-child(2) {
+  background: #ffb703;
+}
+
+.music-notes span:nth-child(3) {
+  background: #2ec4b6;
 }
 
 .login-panel {
@@ -127,7 +188,26 @@ button {
   margin: 0 auto;
   padding: 26px;
   box-shadow: var(--shadow);
-  border-top: 6px solid var(--accent);
+  border-top: 0;
+  position: relative;
+  overflow: hidden;
+}
+
+.login-card::before {
+  content: "";
+  position: absolute;
+  inset: 0 0 auto;
+  height: 8px;
+  background: linear-gradient(90deg, var(--brand), var(--mint), var(--accent), var(--coral), var(--violet));
+}
+
+.login-icon {
+  width: 52px;
+  height: 52px;
+  margin-bottom: 18px;
+  color: #fff;
+  background: linear-gradient(135deg, var(--coral), var(--violet));
+  font-size: 25px;
 }
 
 .login-card h2,
