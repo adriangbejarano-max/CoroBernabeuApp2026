@@ -573,6 +573,11 @@ textarea:focus {
   border-left: 5px solid var(--category-color, var(--accent));
 }
 
+.admin-item.active-event-item {
+  border-color: var(--success);
+  background: linear-gradient(135deg, #f0fff9, #ffffff);
+}
+
 .admin-item h3 {
   margin: 0 0 4px;
   font-size: 16px;

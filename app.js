@@ -486,7 +486,6 @@ function renderApp(user) {
           ${adminTabs}
         </nav>
         <section class="content">
-          ${renderEventStrip()}
           ${renderActiveView(user)}
         </section>
       </div>
@@ -520,27 +519,6 @@ function renderVolunteerApp(user) {
       </section>
       <div class="toast" id="toast"></div>
     </main>
-  `;
-}
-
-function renderEventStrip() {
-  const event = activeEvent();
-  return `
-    <section class="event-strip">
-      <label class="field">
-        <span>Evento activo</span>
-        <select id="eventSelect">
-          <option value="" ${event ? "" : "selected"}>Sin evento activo</option>
-          ${state.events
-            .map(
-              (item) =>
-                `<option value="${item.id}" ${item.id === event?.id ? "selected" : ""}>${escapeHtml(item.name)} - ${escapeHtml(item.date)}</option>`,
-            )
-            .join("")}
-        </select>
-      </label>
-      <div class="badge">${event ? escapeHtml(event.location) : "Los voluntarios no podran hacer check-in"}</div>
-    </section>
   `;
 }
 
@@ -874,6 +852,7 @@ function renderUsersAdmin() {
 }
 
 function renderEventsAdmin() {
+  const event = activeEvent();
   return `
     <section class="admin-grid">
       <form class="panel" id="eventForm">
@@ -891,20 +870,24 @@ function renderEventsAdmin() {
       <section class="panel">
         <div class="panel-title">
           <div>
-            <h2>Eventos</h2>
-            <p>${state.events.length} convocatorias configuradas.</p>
+            <h2>Evento activo</h2>
+            <p>${event ? `${escapeHtml(event.name)} · ${escapeHtml(event.date)}` : "No hay evento activo para los voluntarios."}</p>
           </div>
+          ${event ? `<button class="btn ghost" data-clear-active-event type="button">Desactivar evento</button>` : ""}
         </div>
         <div class="admin-list">
           ${state.events
             .map(
-              (event) => `
-                <article class="admin-item">
+              (item) => `
+                <article class="admin-item ${item.id === state.activeEventId ? "active-event-item" : ""}">
                   <div>
-                    <h3>${escapeHtml(event.name)}</h3>
-                    <p class="muted">${escapeHtml(event.date)} · ${escapeHtml(event.location)}</p>
+                    <h3>${escapeHtml(item.name)} ${item.id === state.activeEventId ? `<span class="badge checked">Activo</span>` : ""}</h3>
+                    <p class="muted">${escapeHtml(item.date)} · ${escapeHtml(item.location)}</p>
                   </div>
-                  <button class="btn danger" data-delete-event="${event.id}" type="button" ${state.events.length === 1 ? "disabled" : ""}>Borrar</button>
+                  <div class="card-actions">
+                    <button class="btn ${item.id === state.activeEventId ? "ghost" : "primary"}" data-activate-event="${item.id}" type="button" ${item.id === state.activeEventId ? "disabled" : ""}>Activar</button>
+                    <button class="btn danger" data-delete-event="${item.id}" type="button" ${state.events.length === 1 ? "disabled" : ""}>Borrar</button>
+                  </div>
                 </article>
               `,
             )
@@ -918,15 +901,6 @@ function renderEventsAdmin() {
 function bindEvents() {
   byId("loginForm")?.addEventListener("submit", handleLogin);
   byId("logoutBtn")?.addEventListener("click", handleLogout);
-  byId("eventSelect")?.addEventListener("change", async (event) => {
-    state.activeEventId = event.target.value;
-    saveState();
-    if (isCloudUser() && currentUser()?.role === "admin") {
-      await saveActiveEventSetting(state.activeEventId);
-      await tryCloudSync();
-    }
-    render();
-  });
 
   document.querySelectorAll("[data-tab]").forEach((button) => {
     button.addEventListener("click", () => {
@@ -967,6 +941,12 @@ function bindEvents() {
   document.querySelectorAll("[data-delete-event]").forEach((button) => {
     button.addEventListener("click", () => deleteEvent(button.dataset.deleteEvent));
   });
+  document.querySelectorAll("[data-activate-event]").forEach((button) => {
+    button.addEventListener("click", () => activateEvent(button.dataset.activateEvent));
+  });
+  document.querySelectorAll("[data-clear-active-event]").forEach((button) => {
+    button.addEventListener("click", () => activateEvent(""));
+  });
 }
 
 async function saveActiveEventSetting(eventId) {
@@ -975,6 +955,22 @@ async function saveActiveEventSetting(eventId) {
     headers: { Prefer: "resolution=merge-duplicates,return=minimal" },
     body: JSON.stringify({ key: "active_event_id", value: eventId || "" }),
   });
+}
+
+async function activateEvent(eventId) {
+  state.activeEventId = eventId || "";
+  saveState();
+  if (isCloudUser() && currentUser()?.role === "admin") {
+    try {
+      await saveActiveEventSetting(state.activeEventId);
+      await tryCloudSync();
+    } catch (error) {
+      console.warn(error);
+      showToast("No se pudo actualizar el evento activo en Supabase.");
+    }
+  }
+  render();
+  showToast(state.activeEventId ? "Evento activado para voluntarios." : "Evento desactivado.");
 }
 
 function updateAdminFilters() {
