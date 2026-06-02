@@ -349,28 +349,24 @@ function renderLogin() {
       <section class="brand-panel">
         <div class="crest">CB</div>
         <div class="brand-copy">
-          <h1>Coro Bernabeu 2026</h1>
-          <p>Check-in sencillo para cantantes, danza, produccion, orquesta, invitados y equipos de apoyo durante la visita del papa Leon XIV.</p>
+          <h1>Visita Papa Leon XIV Madrid 2026</h1>
+          <p>Gestion de accesos para el equipo participante en el encuentro del Santiago Bernabeu.</p>
         </div>
-        <p class="muted">Gestion de accesos y acreditaciones</p>
+        <p class="muted">Check-in de asistentes y acreditaciones</p>
       </section>
       <section class="login-panel">
         <form class="login-card" id="loginForm">
-          <h2>Acceso al equipo</h2>
-          <p>Entra como administrador o voluntario para trabajar con los eventos.</p>
+          <h2>Acceso</h2>
+          <p>Introduce tus credenciales para continuar.</p>
           <label class="field">
             <span>Email</span>
-            <input name="email" type="email" autocomplete="email" value="admin@coro.local" required />
+            <input name="email" type="email" autocomplete="email" required />
           </label>
           <label class="field">
             <span>Contrasena</span>
-            <input name="password" type="password" autocomplete="current-password" value="admin2026" required />
+            <input name="password" type="password" autocomplete="current-password" required />
           </label>
           <button class="btn primary" type="submit">Entrar</button>
-          <div class="demo-users">
-            <div class="demo-pill"><strong>Admin:</strong> admin@coro.local / admin2026</div>
-            <div class="demo-pill"><strong>Voluntario:</strong> voluntario@coro.local / vol2026</div>
-          </div>
         </form>
       </section>
       <div class="toast" id="toast"></div>
