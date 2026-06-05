@@ -44,7 +44,7 @@ Deno.serve(async (req) => {
     .eq("id", caller.id)
     .single();
 
-  if (profileError || callerProfile?.role !== "admin") {
+  if (profileError || !["admin", "supervisor"].includes(callerProfile?.role)) {
     return json({ error: "Only admins can create users" }, 403);
   }
 

@@ -67,7 +67,7 @@ as $$
     select 1
     from public.profiles
     where id = auth.uid()
-      and role = 'admin'
+      and role in ('admin', 'supervisor')
   );
 $$;
 
