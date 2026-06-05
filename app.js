@@ -240,6 +240,14 @@ function saveState() {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
 }
 
+function clearOperationalState() {
+  state.users = [];
+  state.events = [];
+  state.attendees = [];
+  state.activeEventId = "";
+  editingAttendeeId = null;
+}
+
 function loadCloudSession() {
   const saved = localStorage.getItem(SESSION_KEY);
   if (!saved) return null;
@@ -378,12 +386,23 @@ function hasRehearsalCheckin(attendeeCheckins, eventId) {
 async function tryCloudSync(showMessage = false) {
   try {
     const loaded = await loadCloudData();
+    if (!loaded) {
+      cloudReady = false;
+      cloudError = "Sin conexion con Supabase.";
+      clearOperationalState();
+      saveState();
+      return false;
+    }
     if (loaded && showMessage) showToast("Datos sincronizados con Supabase.");
+    return Boolean(loaded);
   } catch (error) {
     cloudReady = false;
-    cloudError = "Supabase pendiente de configurar tablas o usuarios.";
+    cloudError = "Sin conexion con Supabase.";
+    clearOperationalState();
+    saveState();
     console.warn(error);
     if (showMessage) showToast("No se pudo sincronizar con Supabase.");
+    return false;
   }
 }
 
@@ -486,9 +505,45 @@ function showToast(message) {
 }
 
 function render() {
+  if (!supabaseEnabled) {
+    byId("app").innerHTML = renderSupabaseBlocked("Supabase no esta configurado.");
+    bindEvents();
+    return;
+  }
+  if (cloudSession?.access_token && !cloudReady) {
+    byId("app").innerHTML = renderSupabaseBlocked(cloudError || "Sin conexion con Supabase.");
+    bindEvents();
+    return;
+  }
   const user = currentUser();
   byId("app").innerHTML = user ? renderApp(user) : renderLogin();
   bindEvents();
+}
+
+function renderSupabaseBlocked(message) {
+  return `
+    <main class="login-screen">
+      <section class="brand-panel">
+        <div class="crest">!</div>
+        <div class="brand-copy">
+          <span class="login-kicker">Madrid 2026</span>
+          <h1>Conexion requerida</h1>
+          <p>La app solo funciona conectada a Supabase. No se muestran datos ni se permite registrar nada sin conexion.</p>
+        </div>
+        <p class="muted">Visita Papa Leon XIV Madrid 2026</p>
+      </section>
+      <section class="login-panel">
+        <div class="login-card">
+          <div class="login-icon" aria-hidden="true">!</div>
+          <h2>Supabase no disponible</h2>
+          <p>${escapeHtml(message)}</p>
+          <button class="btn primary" id="retrySupabaseBtn" type="button">Reintentar conexion</button>
+          <button class="btn ghost" id="logoutBtn" type="button">Salir</button>
+        </div>
+      </section>
+      <div class="toast" id="toast"></div>
+    </main>
+  `;
 }
 
 function renderLogin() {
@@ -1174,6 +1229,7 @@ function renderEventsAdmin() {
 function bindEvents() {
   byId("loginForm")?.addEventListener("submit", handleLogin);
   byId("logoutBtn")?.addEventListener("click", handleLogout);
+  byId("retrySupabaseBtn")?.addEventListener("click", retrySupabaseConnection);
 
   document.querySelectorAll("[data-tab]").forEach((button) => {
     button.addEventListener("click", () => {
@@ -1305,9 +1361,25 @@ async function handleLogin(event) {
   }
 }
 
+async function retrySupabaseConnection() {
+  if (!cloudSession?.access_token) {
+    render();
+    return;
+  }
+  const loaded = await tryCloudSync(true);
+  if (loaded) {
+    state.currentUserId = cloudSession.user.id;
+    setDefaultTabForUser();
+    saveState();
+  }
+  render();
+}
+
 function handleLogout() {
   state.currentUserId = null;
   cloudReady = false;
+  cloudError = "";
+  clearOperationalState();
   saveCloudSession(null);
   saveState();
   render();
@@ -1718,11 +1790,14 @@ async function deleteEvent(id) {
 async function initApp() {
   if (cloudSession?.access_token) {
     state.currentUserId = cloudSession.user.id;
-    await tryCloudSync();
-    setDefaultTabForUser();
+    const loaded = await tryCloudSync();
+    if (loaded) {
+      setDefaultTabForUser();
+    }
   } else {
     state.currentUserId = null;
     cloudReady = false;
+    clearOperationalState();
     saveState();
   }
   render();
