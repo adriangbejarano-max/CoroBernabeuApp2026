@@ -210,6 +210,10 @@ function normalizeState(nextState) {
   nextState.adminFilters = { ...seedState.adminFilters, ...(nextState.adminFilters || {}) };
   nextState.entrySearch = { ...seedState.entrySearch, ...(nextState.entrySearch || {}) };
   nextState.reports = { ...seedState.reports, ...(nextState.reports || {}) };
+  nextState.users = (nextState.users || []).map((user) => ({
+    ...user,
+    role: normalizeRole(user.role),
+  }));
   nextState.attendees = (nextState.attendees || []).map((person) => ({
     email: "",
     birthDate: "",
@@ -310,7 +314,7 @@ async function loadCloudData() {
     name: profile.full_name,
     email: profile.email || "",
     password: "",
-    role: profile.role,
+    role: normalizeRole(profile.role),
   }));
   state.events = events.map((event) => ({
     id: event.id,
@@ -368,8 +372,14 @@ function currentUser() {
   return state.users.find((user) => user.id === state.currentUserId) || null;
 }
 
+function normalizeRole(role) {
+  if (role === "admin" || role === "supervisor") return "admin";
+  if (role === "volunteer") return "user";
+  return "user";
+}
+
 function hasAdminAccess(user = currentUser()) {
-  return Boolean(user && ["admin", "supervisor"].includes(user.role));
+  return Boolean(user && normalizeRole(user.role) === "admin");
 }
 
 function setDefaultTabForUser() {
@@ -378,7 +388,7 @@ function setDefaultTabForUser() {
   if (hasAdminAccess(user) && !["checkin", "dashboard", "attendees", "users", "events", "reports", "entry-checkin"].includes(state.activeTab)) {
     state.activeTab = "checkin";
   }
-  if (user.role === "volunteer") {
+  if (normalizeRole(user.role) === "user") {
     state.activeTab = "checkin";
   }
 }
@@ -468,7 +478,7 @@ function renderLogin() {
       <section class="login-panel">
         <form class="login-card" id="loginForm">
           <div class="login-icon" aria-hidden="true">♫</div>
-          <h2>Hola, voluntario/a</h2>
+          <h2>Hola, usuario/a</h2>
           <p>Accede para comenzar el check-in.</p>
           <label class="field">
             <span>Email</span>
@@ -487,7 +497,7 @@ function renderLogin() {
 }
 
 function renderApp(user) {
-  if (user.role === "volunteer") return renderVolunteerApp(user);
+  if (normalizeRole(user.role) === "user") return renderUserApp(user);
 
   const adminTabs =
     hasAdminAccess(user)
@@ -538,15 +548,14 @@ function renderApp(user) {
 }
 
 function roleLabel(role) {
-  if (role === "admin") return "Administrador";
-  if (role === "supervisor") return "Administrador";
-  return "Voluntario";
+  if (normalizeRole(role) === "admin") return "ADMIN";
+  return "USUARIO";
 }
 
-function renderVolunteerApp(user) {
+function renderUserApp(user) {
   return `
-    <main class="app-shell volunteer-shell">
-      <header class="topbar volunteer-topbar">
+    <main class="app-shell user-shell">
+      <header class="topbar user-topbar">
         <div class="topbar-brand">
           <div class="mini-crest">CB</div>
           <div>
@@ -557,12 +566,12 @@ function renderVolunteerApp(user) {
         <div class="top-actions">
           <div class="user-box">
             <strong>${escapeHtml(user.name)}</strong>
-            <span>Voluntario/a</span>
+            <span>USUARIO</span>
           </div>
           <button class="btn ghost" id="logoutBtn" type="button">Salir</button>
         </div>
       </header>
-      <section class="volunteer-content">
+      <section class="user-content">
         ${renderVolunteerEventStatus()}
         ${renderCheckin()}
       </section>
@@ -1022,15 +1031,15 @@ function renderAdminAttendee(person) {
 }
 
 function renderUsersAdmin() {
-  const volunteers = state.users.filter((user) => user.role === "volunteer");
-  const admins = state.users.filter((user) => ["admin", "supervisor"].includes(user.role));
+  const users = state.users.filter((user) => normalizeRole(user.role) === "user");
+  const admins = state.users.filter((user) => normalizeRole(user.role) === "admin");
   return `
     <section class="admin-grid">
       <form class="panel" id="userForm">
         <div class="panel-title">
           <div>
             <h2>Crear usuario</h2>
-            <p>Los administradores pueden crear voluntarios y otros administradores.</p>
+            <p>Los administradores pueden crear usuarios y otros administradores.</p>
           </div>
         </div>
         <label class="field"><span>Nombre</span><input name="name" required /></label>
@@ -1039,8 +1048,8 @@ function renderUsersAdmin() {
         <label class="field">
           <span>Rol</span>
           <select name="role">
-            <option value="volunteer">Voluntario</option>
-            <option value="admin">Administrador</option>
+            <option value="user">USUARIO</option>
+            <option value="admin">ADMIN</option>
           </select>
         </label>
         <button class="btn primary" type="submit">Crear usuario</button>
@@ -1049,7 +1058,7 @@ function renderUsersAdmin() {
         <div class="panel-title">
           <div>
             <h2>Usuarios</h2>
-            <p>${admins.length} administradores · ${volunteers.length} voluntarios.</p>
+            <p>${admins.length} ADMIN · ${users.length} USUARIO.</p>
           </div>
         </div>
         <div class="admin-list">
@@ -1092,7 +1101,7 @@ function renderEventsAdmin() {
         <div class="panel-title">
           <div>
             <h2>Evento activo</h2>
-            <p>${event ? `${escapeHtml(event.name)} · ${escapeHtml(event.date)}` : "No hay evento activo para los voluntarios."}</p>
+            <p>${event ? `${escapeHtml(event.name)} · ${escapeHtml(event.date)}` : "No hay evento activo para los usuarios."}</p>
           </div>
           ${event ? `<button class="btn ghost" data-clear-active-event type="button">Desactivar evento</button>` : ""}
         </div>
@@ -1205,7 +1214,7 @@ async function activateEvent(eventId) {
     }
   }
   render();
-  showToast(state.activeEventId ? "Evento activado para voluntarios." : "Evento desactivado.");
+  showToast(state.activeEventId ? "Evento activado para usuarios." : "Evento desactivado.");
 }
 
 function updateAdminFilters() {
@@ -1507,12 +1516,12 @@ async function handleUserSave(event) {
   event.preventDefault();
   const form = new FormData(event.currentTarget);
   const email = String(form.get("email") || "").trim();
-  const role = String(form.get("role") || "volunteer");
+  const role = String(form.get("role") || "user");
   const payload = {
     name: String(form.get("name") || "").trim(),
     email,
     password: String(form.get("password") || ""),
-    role: ["admin", "supervisor", "volunteer"].includes(role) ? role : "volunteer",
+    role: ["admin", "user"].includes(role) ? role : "user",
   };
 
   if (!hasAdminAccess()) {
@@ -1544,7 +1553,7 @@ async function createCloudUser(payload) {
       name: result.profile.full_name,
       email: result.profile.email,
       password: "",
-      role: result.profile.role,
+      role: normalizeRole(result.profile.role),
     });
     saveState();
     await tryCloudSync();

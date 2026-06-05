@@ -4,7 +4,7 @@ create table if not exists public.profiles (
   id uuid primary key references auth.users(id) on delete cascade,
   full_name text not null,
   email text not null default '',
-  role text not null check (role in ('admin', 'supervisor', 'volunteer')),
+  role text not null check (role in ('admin', 'user')),
   created_at timestamptz not null default now()
 );
 
@@ -67,7 +67,7 @@ as $$
     select 1
     from public.profiles
     where id = auth.uid()
-      and role in ('admin', 'supervisor')
+      and role = 'admin'
   );
 $$;
 
@@ -85,22 +85,17 @@ begin
 end $$;
 
 alter table public.profiles
-add constraint profiles_role_check
-check (role in ('admin', 'supervisor', 'volunteer'));
+alter column role set default 'user';
 
-create or replace function public.is_admin_or_supervisor()
-returns boolean
-language sql
-security definer
-set search_path = public
-as $$
-  select exists (
-    select 1
-    from public.profiles
-    where id = auth.uid()
-      and role in ('admin', 'supervisor')
-  );
-$$;
+update public.profiles
+set role = case
+  when role in ('admin', 'supervisor') then 'admin'
+  else 'user'
+end;
+
+alter table public.profiles
+add constraint profiles_role_check
+check (role in ('admin', 'user'));
 
 alter table public.profiles enable row level security;
 alter table public.events enable row level security;
@@ -160,11 +155,7 @@ using (public.is_admin())
 with check (public.is_admin());
 
 drop policy if exists "attendees_update_supervisor" on public.attendees;
-create policy "attendees_update_supervisor"
-on public.attendees for update
-to authenticated
-using (public.is_admin_or_supervisor())
-with check (public.is_admin_or_supervisor());
+drop function if exists public.is_admin_or_supervisor();
 
 drop policy if exists "checkins_select_authenticated" on public.checkins;
 create policy "checkins_select_authenticated"

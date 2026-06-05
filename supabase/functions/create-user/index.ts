@@ -44,7 +44,7 @@ Deno.serve(async (req) => {
     .eq("id", caller.id)
     .single();
 
-  if (profileError || !["admin", "supervisor"].includes(callerProfile?.role)) {
+  if (profileError || callerProfile?.role !== "admin") {
     return json({ error: "Only admins can create users" }, 403);
   }
 
@@ -52,7 +52,7 @@ Deno.serve(async (req) => {
   const email = String(body.email || "").trim().toLowerCase();
   const password = String(body.password || "");
   const fullName = String(body.name || "").trim();
-  const role = ["admin", "supervisor", "volunteer"].includes(body.role) ? body.role : "volunteer";
+  const role = ["admin", "user"].includes(body.role) ? body.role : "user";
 
   if (!email || !password || !fullName) {
     return json({ error: "Missing name, email or password" }, 400);

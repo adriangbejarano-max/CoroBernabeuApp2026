@@ -14,14 +14,13 @@ Luego entra en `http://localhost:4173`.
 
 ## Funciones incluidas
 
-- Login con roles de administrador y voluntario.
+- Login con dos roles: `ADMIN` y `USUARIO`.
 - Check-in por evento.
 - Busqueda rapida por DNI.
 - Busqueda avanzada por nombre completo.
 - Soporte para varios perfiles con el mismo DNI.
 - Panel de resumen por evento y categoria.
-- Administrador: crear y editar asistentes, cambiar categoria, crear voluntarios y crear eventos.
-- Persistencia local en el navegador con `localStorage`.
+- ADMIN: crear y editar asistentes, cambiar categoria, crear usuarios y crear eventos.
 - Configuracion preparada para Supabase Auth y tablas cloud.
 
 ## Siguiente paso recomendado
@@ -45,7 +44,7 @@ La app incluye:
 - `data/import-attendees.sql` generado desde `data/asistentes.xlsx`.
 - `docs-supabase-setup.md` con los pasos para crear usuarios y publicar.
 - `docs-deploy-vercel.md` con los pasos de GitHub y Vercel.
-- `supabase/functions/create-user` para crear admins y voluntarios desde la app.
+- `supabase/functions/create-user` para crear usuarios y admins desde la app.
 
 La app requiere usuarios reales de Supabase Auth. No hay login local ni credenciales demo.
 

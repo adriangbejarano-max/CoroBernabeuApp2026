@@ -394,7 +394,7 @@ textarea:focus {
   min-width: 0;
 }
 
-.volunteer-content {
+.user-content {
   width: min(100%, 980px);
   margin: 0 auto;
   display: grid;
@@ -402,7 +402,7 @@ textarea:focus {
   padding: 22px clamp(16px, 4vw, 34px) 34px;
 }
 
-.volunteer-shell .panel {
+.user-shell .panel {
   border-top: 6px solid var(--accent);
 }
 

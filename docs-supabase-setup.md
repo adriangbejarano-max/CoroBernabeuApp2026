@@ -46,7 +46,7 @@ La app incluye una Edge Function segura en:
 supabase/functions/create-user/index.ts
 ```
 
-Esta funcion permite que un administrador cree usuarios con rol `volunteer` o `admin`.
+Esta funcion permite que un administrador cree usuarios con rol `user` o `admin`.
 
 Para desplegarla:
 
