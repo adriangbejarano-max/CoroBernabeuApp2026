@@ -27,22 +27,7 @@ const seedState = {
     source: "",
     createdDate: "",
   },
-  users: [
-    {
-      id: "admin-1",
-      name: "Administrador Coro",
-      email: "admin@coro.local",
-      password: "admin2026",
-      role: "admin",
-    },
-    {
-      id: "vol-1",
-      name: "Voluntaria Puerta Norte",
-      email: "voluntario@coro.local",
-      password: "vol2026",
-      role: "volunteer",
-    },
-  ],
+  users: [],
   events: [
     {
       id: "misa-bernabeu",
@@ -326,7 +311,7 @@ async function tryCloudSync(showMessage = false) {
     cloudReady = false;
     cloudError = "Supabase pendiente de configurar tablas o usuarios.";
     console.warn(error);
-    if (showMessage) showToast("No se pudo sincronizar con Supabase. Usando datos locales.");
+    if (showMessage) showToast("No se pudo sincronizar con Supabase.");
   }
 }
 
@@ -469,7 +454,7 @@ function renderApp(user) {
         </div>
         <div class="top-actions">
           <div class="badge ${cloudReady ? "checked" : ""}" title="${escapeHtml(cloudError || "Estado de conexion")}">
-            ${cloudReady ? "Supabase" : "Local"}
+            ${cloudReady ? "Supabase" : "Sin conexion"}
           </div>
           <div class="user-box">
             <strong>${escapeHtml(user.name)}</strong>
@@ -985,35 +970,30 @@ async function handleLogin(event) {
   event.preventDefault();
   const form = new FormData(event.currentTarget);
   const rawEmail = String(form.get("email") || "").trim();
-  const email = normalize(rawEmail);
   const password = String(form.get("password") || "");
 
-  if (supabaseEnabled) {
-    try {
-      const session = await signInWithSupabase(rawEmail, password);
-      state.currentUserId = session.user.id;
-      state.activeTab = "checkin";
-      await loadCloudData();
-      saveState();
-      render();
-      showToast("Sesion iniciada con Supabase.");
-      return;
-    } catch (error) {
-      cloudReady = false;
-      cloudError = "Login Supabase no disponible todavia.";
-      console.warn(error);
-    }
-  }
-
-  const user = state.users.find((item) => normalize(item.email) === email && item.password === password);
-  if (!user) {
-    showToast("Credenciales incorrectas.");
+  if (!supabaseEnabled) {
+    showToast("Supabase no esta configurado.");
     return;
   }
-  state.currentUserId = user.id;
-  state.activeTab = "checkin";
-  saveState();
-  render();
+
+  try {
+    const session = await signInWithSupabase(rawEmail, password);
+    state.currentUserId = session.user.id;
+    state.activeTab = "checkin";
+    await loadCloudData();
+    saveState();
+    render();
+    showToast("Sesion iniciada con Supabase.");
+  } catch (error) {
+    cloudReady = false;
+    cloudError = "Login Supabase no disponible.";
+    saveCloudSession(null);
+    state.currentUserId = null;
+    saveState();
+    console.warn(error);
+    showToast("Credenciales incorrectas o usuario no disponible en Supabase.");
+  }
 }
 
 function handleLogout() {
@@ -1281,6 +1261,10 @@ async function initApp() {
   if (cloudSession?.access_token) {
     state.currentUserId = cloudSession.user.id;
     await tryCloudSync();
+  } else {
+    state.currentUserId = null;
+    cloudReady = false;
+    saveState();
   }
   render();
 }

@@ -12,11 +12,6 @@ python3 -m http.server 4173
 
 Luego entra en `http://localhost:4173`.
 
-## Usuarios demo
-
-- Administrador: `admin@coro.local` / `admin2026`
-- Voluntario: `voluntario@coro.local` / `vol2026`
-
 ## Funciones incluidas
 
 - Login con roles de administrador y voluntario.
@@ -52,7 +47,7 @@ La app incluye:
 - `docs-deploy-vercel.md` con los pasos de GitHub y Vercel.
 - `supabase/functions/create-user` para crear admins y voluntarios desde la app.
 
-Mientras Supabase no tenga las tablas/usuarios creados, la app funciona en modo local.
+La app requiere usuarios reales de Supabase Auth. No hay login local ni credenciales demo.
 
 Orden recomendado en Supabase SQL Editor:
 
