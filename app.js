@@ -71,6 +71,7 @@ const seedState = {
       source: "manual",
       rehearsal01: false,
       rehearsal02: false,
+      rehearsal03: false,
       ticketStatus: "ACREDITADO",
       createdAt: "2026-06-02T00:00:00.000Z",
       phone: "600 111 222",
@@ -89,6 +90,7 @@ const seedState = {
       source: "manual",
       rehearsal01: false,
       rehearsal02: false,
+      rehearsal03: false,
       ticketStatus: "ACREDITADO",
       createdAt: "2026-06-02T00:00:00.000Z",
       phone: "600 222 333",
@@ -107,6 +109,7 @@ const seedState = {
       source: "manual",
       rehearsal01: false,
       rehearsal02: false,
+      rehearsal03: false,
       ticketStatus: "ACREDITADO",
       createdAt: "2026-06-02T00:00:00.000Z",
       phone: "600 333 444",
@@ -125,6 +128,7 @@ const seedState = {
       source: "manual",
       rehearsal01: false,
       rehearsal02: false,
+      rehearsal03: false,
       ticketStatus: "ACREDITADO",
       createdAt: "2026-06-02T00:00:00.000Z",
       phone: "600 333 444",
@@ -143,6 +147,7 @@ const seedState = {
       source: "manual",
       rehearsal01: false,
       rehearsal02: false,
+      rehearsal03: false,
       ticketStatus: "ACREDITADO",
       createdAt: "2026-06-02T00:00:00.000Z",
       phone: "600 333 444",
@@ -161,6 +166,7 @@ const seedState = {
       source: "manual",
       rehearsal01: false,
       rehearsal02: false,
+      rehearsal03: false,
       ticketStatus: "ACREDITADO",
       createdAt: "2026-06-02T00:00:00.000Z",
       phone: "600 444 555",
@@ -179,6 +185,7 @@ const seedState = {
       source: "manual",
       rehearsal01: false,
       rehearsal02: false,
+      rehearsal03: false,
       ticketStatus: "ACREDITADO",
       createdAt: "2026-06-02T00:00:00.000Z",
       phone: "600 555 666",
@@ -221,6 +228,7 @@ function normalizeState(nextState) {
     source: "manual",
     rehearsal01: false,
     rehearsal02: false,
+    rehearsal03: false,
     ticketStatus: "ACREDITADO",
     createdAt: new Date().toISOString(),
     ...person,
@@ -308,6 +316,7 @@ async function loadCloudData() {
     };
     return acc;
   }, {});
+  const rehearsalEventIds = getRehearsalEventIds(events);
 
   state.users = profiles.map((profile) => ({
     id: profile.id,
@@ -332,8 +341,9 @@ async function loadCloudData() {
     birthDate: person.birth_date || "",
     accreditation: person.accreditation || "",
     source: person.source || "manual",
-    rehearsal01: Boolean(person.rehearsal_01),
-    rehearsal02: Boolean(person.rehearsal_02),
+    rehearsal01: Boolean(person.rehearsal_01) || hasRehearsalCheckin(checkinsByAttendee[person.id], rehearsalEventIds[1]),
+    rehearsal02: Boolean(person.rehearsal_02) || hasRehearsalCheckin(checkinsByAttendee[person.id], rehearsalEventIds[2]),
+    rehearsal03: Boolean(person.rehearsal_03) || hasRehearsalCheckin(checkinsByAttendee[person.id], rehearsalEventIds[3]),
     ticketStatus: person.ticket_status || "ACREDITADO",
     createdAt: person.created_at,
     phone: person.phone,
@@ -346,6 +356,23 @@ async function loadCloudData() {
   cloudError = "";
   saveState();
   return true;
+}
+
+function getRehearsalEventIds(events) {
+  return events.reduce((acc, event) => {
+    const name = normalize(event.name);
+    [1, 2, 3].forEach((number) => {
+      const padded = String(number).padStart(2, "0");
+      if (name.includes(`ensayo ${number}`) || name.includes(`ensayo ${padded}`)) {
+        acc[number] = event.id;
+      }
+    });
+    return acc;
+  }, {});
+}
+
+function hasRehearsalCheckin(attendeeCheckins, eventId) {
+  return Boolean(eventId && attendeeCheckins?.[eventId]);
 }
 
 async function tryCloudSync(showMessage = false) {
@@ -362,6 +389,12 @@ async function tryCloudSync(showMessage = false) {
 
 function isCloudUser() {
   return Boolean(cloudReady && cloudSession?.access_token && currentUser()?.password === "");
+}
+
+function requireCloudWrite(message = "No se puede registrar nada sin conexion a Supabase.") {
+  if (isCloudUser()) return true;
+  showToast(message);
+  return false;
 }
 
 function byId(id) {
@@ -794,6 +827,10 @@ function renderEntryRow(person) {
         <input type="checkbox" data-entry-field="rehearsal02" data-entry-id="${person.id}" ${person.rehearsal02 ? "checked" : ""} />
         <span>ENSAYO 02</span>
       </label>
+      <label class="check-field">
+        <input type="checkbox" data-entry-field="rehearsal03" data-entry-id="${person.id}" ${person.rehearsal03 ? "checked" : ""} />
+        <span>ENSAYO 03</span>
+      </label>
       <label class="field compact-field">
         <span>Entrada</span>
         <select data-ticket-status="${person.id}">
@@ -1212,15 +1249,18 @@ async function saveActiveEventSetting(eventId) {
 }
 
 async function activateEvent(eventId) {
-  state.activeEventId = eventId || "";
-  saveState();
-  if (isCloudUser() && hasAdminAccess()) {
+  if (!requireCloudWrite("No se puede activar un evento sin conexion a Supabase.")) return;
+  const nextActiveEventId = eventId || "";
+  if (hasAdminAccess()) {
     try {
-      await saveActiveEventSetting(state.activeEventId);
+      await saveActiveEventSetting(nextActiveEventId);
+      state.activeEventId = nextActiveEventId;
+      saveState();
       await tryCloudSync();
     } catch (error) {
       console.warn(error);
       showToast("No se pudo actualizar el evento activo en Supabase.");
+      return;
     }
   }
   render();
@@ -1300,29 +1340,37 @@ function updateReportFilter() {
 }
 
 async function updateEntryField(attendeeId, field, value) {
+  if (!requireCloudWrite()) {
+    byId("entryResults").innerHTML = renderEntryResults();
+    bindEntryControls();
+    return;
+  }
   const person = state.attendees.find((item) => item.id === attendeeId);
   if (!person) return;
-  person[field] = value;
-  saveState();
 
   const cloudField = {
     rehearsal01: "rehearsal_01",
     rehearsal02: "rehearsal_02",
+    rehearsal03: "rehearsal_03",
     ticketStatus: "ticket_status",
   }[field];
 
-  if (isCloudUser() && cloudField) {
-    try {
-      await supabaseRequest(`/rest/v1/attendees?id=eq.${encodeURIComponent(attendeeId)}`, {
-        method: "PATCH",
-        headers: { Prefer: "return=minimal" },
-        body: JSON.stringify({ [cloudField]: value }),
-      });
-      showToast("Registro actualizado.");
-    } catch (error) {
-      console.warn(error);
-      showToast("No se pudo actualizar en Supabase.");
-    }
+  if (!cloudField) return;
+
+  try {
+    await supabaseRequest(`/rest/v1/attendees?id=eq.${encodeURIComponent(attendeeId)}`, {
+      method: "PATCH",
+      headers: { Prefer: "return=minimal" },
+      body: JSON.stringify({ [cloudField]: value }),
+    });
+    person[field] = value;
+    saveState();
+    showToast("Registro actualizado.");
+  } catch (error) {
+    console.warn(error);
+    byId("entryResults").innerHTML = renderEntryResults();
+    bindEntryControls();
+    showToast("No se pudo actualizar en Supabase.");
   }
 }
 
@@ -1396,6 +1444,7 @@ function handleCompareFile(event) {
 }
 
 async function toggleCheckin(attendeeId) {
+  if (!requireCloudWrite()) return;
   const person = state.attendees.find((item) => item.id === attendeeId);
   if (!person) return;
   const event = activeEvent();
@@ -1404,41 +1453,41 @@ async function toggleCheckin(attendeeId) {
     return;
   }
   if (person.checkins[event.id]) {
-    delete person.checkins[event.id];
-    if (isCloudUser()) {
-      try {
-        await supabaseRequest(`/rest/v1/checkins?attendee_id=eq.${encodeURIComponent(person.id)}&event_id=eq.${encodeURIComponent(event.id)}`, {
-          method: "DELETE",
-          headers: { Prefer: "return=minimal" },
-        });
-      } catch (error) {
-        console.warn(error);
-        showToast("No se pudo desmarcar en Supabase.");
-      }
+    try {
+      await supabaseRequest(`/rest/v1/checkins?attendee_id=eq.${encodeURIComponent(person.id)}&event_id=eq.${encodeURIComponent(event.id)}`, {
+        method: "DELETE",
+        headers: { Prefer: "return=minimal" },
+      });
+      delete person.checkins[event.id];
+      showToast(`${person.fullName} queda pendiente en ${event.name}.`);
+    } catch (error) {
+      console.warn(error);
+      showToast("No se pudo desmarcar en Supabase.");
+      return;
     }
-    showToast(`${person.fullName} queda pendiente en ${event.name}.`);
   } else {
-    person.checkins[event.id] = {
-      time: new Date().toLocaleTimeString("es-ES", { hour: "2-digit", minute: "2-digit" }),
-      by: currentUser()?.name || "Equipo",
-    };
-    if (isCloudUser()) {
-      try {
-        await supabaseRequest("/rest/v1/checkins?on_conflict=attendee_id,event_id", {
-          method: "POST",
-          headers: { Prefer: "resolution=merge-duplicates,return=minimal" },
-          body: JSON.stringify({
-            attendee_id: person.id,
-            event_id: event.id,
-            checked_by: cloudSession.user.id,
-          }),
-        });
-      } catch (error) {
-        console.warn(error);
-        showToast("No se pudo guardar el check-in en Supabase.");
-      }
+    try {
+      await supabaseRequest("/rest/v1/checkins?on_conflict=attendee_id,event_id", {
+        method: "POST",
+        headers: { Prefer: "resolution=merge-duplicates,return=minimal" },
+        body: JSON.stringify({
+          attendee_id: person.id,
+          event_id: event.id,
+          checked_by: cloudSession.user.id,
+        }),
+      });
+      person.checkins[event.id] = {
+        time: new Date().toLocaleTimeString("es-ES", { hour: "2-digit", minute: "2-digit" }),
+        by: cloudSession.user.id,
+        byName: currentUser()?.name || "",
+        iso: new Date().toISOString(),
+      };
+      showToast(`Check-in realizado: ${person.fullName}.`);
+    } catch (error) {
+      console.warn(error);
+      showToast("No se pudo guardar el check-in en Supabase.");
+      return;
     }
-    showToast(`Check-in realizado: ${person.fullName}.`);
   }
   saveState();
   await tryCloudSync();
@@ -1447,6 +1496,7 @@ async function toggleCheckin(attendeeId) {
 
 async function handleAttendeeSave(event) {
   event.preventDefault();
+  if (!requireCloudWrite("No se puede guardar asistentes sin conexion a Supabase.")) return;
   const form = new FormData(event.currentTarget);
   const id = String(form.get("id") || "");
   const payload = {
@@ -1463,26 +1513,45 @@ async function handleAttendeeSave(event) {
 
   if (id) {
     const person = state.attendees.find((item) => item.id === id);
-    Object.assign(person, payload);
-    if (isCloudUser()) {
+    if (!person) return;
+    try {
       await supabaseRequest(`/rest/v1/attendees?id=eq.${encodeURIComponent(id)}`, {
         method: "PATCH",
         headers: { Prefer: "return=minimal" },
-        body: JSON.stringify(toCloudAttendee(payload)),
+        body: JSON.stringify(toCloudAttendee({ ...person, ...payload })),
       });
+      Object.assign(person, payload);
+      showToast("Ficha actualizada.");
+    } catch (error) {
+      console.warn(error);
+      showToast("No se pudo actualizar en Supabase.");
+      return;
     }
-    showToast("Ficha actualizada.");
   } else {
-    const newAttendee = { id: crypto.randomUUID(), ...payload, source: "manual", createdAt: new Date().toISOString(), checkins: {} };
-    state.attendees.unshift(newAttendee);
-    if (isCloudUser()) {
+    const newAttendee = {
+      id: crypto.randomUUID(),
+      ...payload,
+      source: "manual",
+      rehearsal01: false,
+      rehearsal02: false,
+      rehearsal03: false,
+      ticketStatus: "ACREDITADO",
+      createdAt: new Date().toISOString(),
+      checkins: {},
+    };
+    try {
       await supabaseRequest("/rest/v1/attendees", {
         method: "POST",
         headers: { Prefer: "return=minimal" },
-        body: JSON.stringify({ id: newAttendee.id, ...toCloudAttendee(payload) }),
+        body: JSON.stringify({ id: newAttendee.id, ...toCloudAttendee(newAttendee) }),
       });
+      state.attendees.unshift(newAttendee);
+      showToast("Asistente creado.");
+    } catch (error) {
+      console.warn(error);
+      showToast("No se pudo crear en Supabase.");
+      return;
     }
-    showToast("Asistente creado.");
   }
   editingAttendeeId = null;
   saveState();
@@ -1491,12 +1560,17 @@ async function handleAttendeeSave(event) {
 }
 
 async function deleteAttendee(id) {
-  state.attendees = state.attendees.filter((person) => person.id !== id);
-  if (isCloudUser()) {
+  if (!requireCloudWrite("No se puede borrar asistentes sin conexion a Supabase.")) return;
+  try {
     await supabaseRequest(`/rest/v1/attendees?id=eq.${encodeURIComponent(id)}`, {
       method: "DELETE",
       headers: { Prefer: "return=minimal" },
     });
+    state.attendees = state.attendees.filter((person) => person.id !== id);
+  } catch (error) {
+    console.warn(error);
+    showToast("No se pudo borrar en Supabase.");
+    return;
   }
   saveState();
   await tryCloudSync();
@@ -1515,6 +1589,7 @@ function toCloudAttendee(person) {
     accreditation: person.accreditation,
     rehearsal_01: Boolean(person.rehearsal01),
     rehearsal_02: Boolean(person.rehearsal02),
+    rehearsal_03: Boolean(person.rehearsal03),
     ticket_status: person.ticketStatus || "ACREDITADO",
     phone: person.phone,
     notes: person.notes,
@@ -1577,14 +1652,12 @@ async function createCloudUser(payload) {
 }
 
 function deleteUser(id) {
-  state.users = state.users.filter((user) => user.id !== id);
-  saveState();
-  render();
-  showToast("Usuario eliminado.");
+  showToast("Para borrar usuarios hay que hacerlo desde Supabase Auth.");
 }
 
 async function handleEventSave(event) {
   event.preventDefault();
+  if (!requireCloudWrite("No se puede crear eventos sin conexion a Supabase.")) return;
   const form = new FormData(event.currentTarget);
   const newEvent = {
     id: crypto.randomUUID(),
@@ -1592,8 +1665,7 @@ async function handleEventSave(event) {
     date: String(form.get("date") || ""),
     location: String(form.get("location") || "").trim(),
   };
-  state.events.push(newEvent);
-  if (isCloudUser()) {
+  try {
     await supabaseRequest("/rest/v1/events", {
       method: "POST",
       headers: { Prefer: "return=minimal" },
@@ -1604,6 +1676,11 @@ async function handleEventSave(event) {
         location: newEvent.location,
       }),
     });
+    state.events.push(newEvent);
+  } catch (error) {
+    console.warn(error);
+    showToast("No se pudo crear el evento en Supabase.");
+    return;
   }
   saveState();
   await tryCloudSync();
@@ -1613,17 +1690,24 @@ async function handleEventSave(event) {
 
 async function deleteEvent(id) {
   if (state.events.length === 1) return;
-  state.events = state.events.filter((event) => event.id !== id);
-  state.attendees.forEach((person) => delete person.checkins[id]);
-  if (state.activeEventId === id) {
-    state.activeEventId = "";
-    if (isCloudUser()) await saveActiveEventSetting("");
-  }
-  if (isCloudUser()) {
+  if (!requireCloudWrite("No se puede borrar eventos sin conexion a Supabase.")) return;
+  try {
+    if (state.activeEventId === id) {
+      await saveActiveEventSetting("");
+    }
     await supabaseRequest(`/rest/v1/events?id=eq.${encodeURIComponent(id)}`, {
       method: "DELETE",
       headers: { Prefer: "return=minimal" },
     });
+  } catch (error) {
+    console.warn(error);
+    showToast("No se pudo borrar el evento en Supabase.");
+    return;
+  }
+  state.events = state.events.filter((event) => event.id !== id);
+  state.attendees.forEach((person) => delete person.checkins[id]);
+  if (state.activeEventId === id) {
+    state.activeEventId = "";
   }
   saveState();
   await tryCloudSync();

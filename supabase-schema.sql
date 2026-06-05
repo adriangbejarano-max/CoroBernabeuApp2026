@@ -28,6 +28,7 @@ create table if not exists public.attendees (
   source text not null default 'manual' check (source in ('manual', 'excel')),
   rehearsal_01 boolean not null default false,
   rehearsal_02 boolean not null default false,
+  rehearsal_03 boolean not null default false,
   ticket_status text not null default 'ACREDITADO' check (ticket_status in ('ACREDITADO', 'ENTRADA', 'ENTRADA ASIGNADA')),
   phone text not null default '',
   notes text not null default '',
@@ -40,6 +41,7 @@ alter table public.attendees add column if not exists accreditation text not nul
 alter table public.attendees add column if not exists source text not null default 'manual';
 alter table public.attendees add column if not exists rehearsal_01 boolean not null default false;
 alter table public.attendees add column if not exists rehearsal_02 boolean not null default false;
+alter table public.attendees add column if not exists rehearsal_03 boolean not null default false;
 alter table public.attendees add column if not exists ticket_status text not null default 'ACREDITADO';
 
 create table if not exists public.checkins (

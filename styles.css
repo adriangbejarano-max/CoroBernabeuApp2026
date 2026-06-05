@@ -485,7 +485,7 @@ textarea:focus {
 
 .entry-row {
   display: grid;
-  grid-template-columns: minmax(240px, 1fr) auto auto minmax(190px, 0.5fr);
+  grid-template-columns: minmax(220px, 1fr) auto auto auto minmax(190px, 0.5fr);
   gap: 12px;
   align-items: center;
   padding: 14px;
