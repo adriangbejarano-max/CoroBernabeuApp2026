@@ -27,6 +27,16 @@ const seedState = {
     source: "",
     createdDate: "",
   },
+  entrySearch: {
+    firstName: "",
+    lastName: "",
+    dni: "",
+  },
+  reports: {
+    selectedEventId: "",
+    compareRaw: "",
+    missingNames: [],
+  },
   users: [],
   events: [
     {
@@ -59,6 +69,9 @@ const seedState = {
       birthDate: "",
       accreditation: "GRADA",
       source: "manual",
+      rehearsal01: false,
+      rehearsal02: false,
+      ticketStatus: "ACREDITADO",
       createdAt: "2026-06-02T00:00:00.000Z",
       phone: "600 111 222",
       notes: "Coro parroquial San Juan",
@@ -74,6 +87,9 @@ const seedState = {
       birthDate: "",
       accreditation: "ZONA CERO",
       source: "manual",
+      rehearsal01: false,
+      rehearsal02: false,
+      ticketStatus: "ACREDITADO",
       createdAt: "2026-06-02T00:00:00.000Z",
       phone: "600 222 333",
       notes: "Entrada con grupo de danza",
@@ -89,6 +105,9 @@ const seedState = {
       birthDate: "",
       accreditation: "GRADA",
       source: "manual",
+      rehearsal01: false,
+      rehearsal02: false,
+      ticketStatus: "ACREDITADO",
       createdAt: "2026-06-02T00:00:00.000Z",
       phone: "600 333 444",
       notes: "Madre de Pablo y Clara",
@@ -104,6 +123,9 @@ const seedState = {
       birthDate: "",
       accreditation: "GRADA",
       source: "manual",
+      rehearsal01: false,
+      rehearsal02: false,
+      ticketStatus: "ACREDITADO",
       createdAt: "2026-06-02T00:00:00.000Z",
       phone: "600 333 444",
       notes: "Menor asociado al DNI familiar",
@@ -119,6 +141,9 @@ const seedState = {
       birthDate: "",
       accreditation: "GRADA",
       source: "manual",
+      rehearsal01: false,
+      rehearsal02: false,
+      ticketStatus: "ACREDITADO",
       createdAt: "2026-06-02T00:00:00.000Z",
       phone: "600 333 444",
       notes: "Menor asociado al DNI familiar",
@@ -134,6 +159,9 @@ const seedState = {
       birthDate: "",
       accreditation: "ZONA CERO",
       source: "manual",
+      rehearsal01: false,
+      rehearsal02: false,
+      ticketStatus: "ACREDITADO",
       createdAt: "2026-06-02T00:00:00.000Z",
       phone: "600 444 555",
       notes: "Violin",
@@ -149,6 +177,9 @@ const seedState = {
       birthDate: "",
       accreditation: "ZONA CERO",
       source: "manual",
+      rehearsal01: false,
+      rehearsal02: false,
+      ticketStatus: "ACREDITADO",
       createdAt: "2026-06-02T00:00:00.000Z",
       phone: "600 555 666",
       notes: "Coordinacion de backstage",
@@ -177,11 +208,16 @@ function loadState() {
 function normalizeState(nextState) {
   nextState.search = { ...seedState.search, ...(nextState.search || {}) };
   nextState.adminFilters = { ...seedState.adminFilters, ...(nextState.adminFilters || {}) };
+  nextState.entrySearch = { ...seedState.entrySearch, ...(nextState.entrySearch || {}) };
+  nextState.reports = { ...seedState.reports, ...(nextState.reports || {}) };
   nextState.attendees = (nextState.attendees || []).map((person) => ({
     email: "",
     birthDate: "",
     accreditation: "",
     source: "manual",
+    rehearsal01: false,
+    rehearsal02: false,
+    ticketStatus: "ACREDITADO",
     createdAt: new Date().toISOString(),
     ...person,
   }));
@@ -263,6 +299,8 @@ async function loadCloudData() {
         minute: "2-digit",
       }),
       by: row.checked_by || "Equipo",
+      byName: profiles.find((profile) => profile.id === row.checked_by)?.full_name || "",
+      iso: row.checked_in_at,
     };
     return acc;
   }, {});
@@ -290,6 +328,9 @@ async function loadCloudData() {
     birthDate: person.birth_date || "",
     accreditation: person.accreditation || "",
     source: person.source || "manual",
+    rehearsal01: Boolean(person.rehearsal_01),
+    rehearsal02: Boolean(person.rehearsal_02),
+    ticketStatus: person.ticket_status || "ACREDITADO",
     createdAt: person.created_at,
     phone: person.phone,
     notes: person.notes,
@@ -325,6 +366,17 @@ function byId(id) {
 
 function currentUser() {
   return state.users.find((user) => user.id === state.currentUserId) || null;
+}
+
+function setDefaultTabForUser() {
+  const user = currentUser();
+  if (!user) return;
+  if (user.role === "supervisor" && !["entry-checkin", "reports"].includes(state.activeTab)) {
+    state.activeTab = "entry-checkin";
+  }
+  if (user.role === "volunteer") {
+    state.activeTab = "checkin";
+  }
 }
 
 function activeEvent() {
@@ -432,6 +484,7 @@ function renderLogin() {
 
 function renderApp(user) {
   if (user.role === "volunteer") return renderVolunteerApp(user);
+  if (user.role === "supervisor") return renderSupervisorApp(user);
 
   const adminTabs =
     user.role === "admin"
@@ -439,6 +492,7 @@ function renderApp(user) {
         <button class="btn tab ${state.activeTab === "attendees" ? "active" : ""}" data-tab="attendees">Editar asistentes</button>
         <button class="btn tab ${state.activeTab === "users" ? "active" : ""}" data-tab="users">Usuarios</button>
         <button class="btn tab ${state.activeTab === "events" ? "active" : ""}" data-tab="events">Eventos</button>
+        <button class="btn tab ${state.activeTab === "reports" ? "active" : ""}" data-tab="reports">Registros</button>
       `
       : "";
 
@@ -458,7 +512,7 @@ function renderApp(user) {
           </div>
           <div class="user-box">
             <strong>${escapeHtml(user.name)}</strong>
-            <span>${user.role === "admin" ? "Administrador" : "Voluntario"}</span>
+            <span>${roleLabel(user.role)}</span>
           </div>
           <button class="btn ghost" id="logoutBtn" type="button">Salir</button>
         </div>
@@ -472,6 +526,46 @@ function renderApp(user) {
         </nav>
         <section class="content">
           ${renderActiveView(user)}
+        </section>
+      </div>
+      <div class="toast" id="toast"></div>
+    </main>
+  `;
+}
+
+function roleLabel(role) {
+  if (role === "admin") return "Administrador";
+  if (role === "supervisor") return "Supervisor";
+  return "Voluntario";
+}
+
+function renderSupervisorApp(user) {
+  return `
+    <main class="app-shell">
+      <header class="topbar">
+        <div class="topbar-brand">
+          <div class="mini-crest">CB</div>
+          <div>
+            <strong>Supervision</strong>
+            <span>Entradas y registros</span>
+          </div>
+        </div>
+        <div class="top-actions">
+          <div class="badge checked">Supabase</div>
+          <div class="user-box">
+            <strong>${escapeHtml(user.name)}</strong>
+            <span>Supervisor</span>
+          </div>
+          <button class="btn ghost" id="logoutBtn" type="button">Salir</button>
+        </div>
+      </header>
+      <div class="layout">
+        <nav class="sidebar">
+          <button class="btn tab ${state.activeTab === "entry-checkin" ? "active" : ""}" data-tab="entry-checkin">Check-in entradas</button>
+          <button class="btn tab ${state.activeTab === "reports" ? "active" : ""}" data-tab="reports">Registros</button>
+        </nav>
+        <section class="content">
+          ${state.activeTab === "reports" ? renderReports() : renderEntryCheckin()}
         </section>
       </div>
       <div class="toast" id="toast"></div>
@@ -533,6 +627,7 @@ function renderActiveView(user) {
   if (state.activeTab === "attendees" && user.role === "admin") return renderAttendeesAdmin();
   if (state.activeTab === "users" && user.role === "admin") return renderUsersAdmin();
   if (state.activeTab === "events" && user.role === "admin") return renderEventsAdmin();
+  if (state.activeTab === "reports" && (user.role === "admin" || user.role === "supervisor")) return renderReports();
   return renderCheckin();
 }
 
@@ -637,6 +732,176 @@ function renderResults(results) {
     return `<div class="empty-state">No hay asistentes que coincidan con la busqueda.</div>`;
   }
   return results.map(renderPersonCard).join("");
+}
+
+function renderEntryCheckin() {
+  const results = getEntrySearchResults();
+  return `
+    <section class="panel">
+      <div class="panel-title">
+        <div>
+          <h2>Check-in entradas</h2>
+          <p>Busca por nombre, apellido o DNI. Con un solo campo relleno ya se realiza la busqueda.</p>
+        </div>
+      </div>
+      <div class="entry-search-grid">
+        <label class="field">
+          <span>Nombre</span>
+          <input id="entryFirstNameSearch" placeholder="Nombre" value="${escapeHtml(state.entrySearch.firstName)}" />
+        </label>
+        <label class="field">
+          <span>Apellido</span>
+          <input id="entryLastNameSearch" placeholder="Apellido" value="${escapeHtml(state.entrySearch.lastName)}" />
+        </label>
+        <label class="field">
+          <span>DNI</span>
+          <input id="entryDniSearch" placeholder="DNI" value="${escapeHtml(state.entrySearch.dni)}" />
+        </label>
+      </div>
+    </section>
+    <section class="entry-list">
+      ${hasEntrySearch() ? renderEntryRows(results) : `<div class="empty-state search-empty"><strong>Busca para ver participantes</strong><span>No se muestra ningun registro hasta introducir nombre, apellido o DNI.</span></div>`}
+    </section>
+  `;
+}
+
+function hasEntrySearch() {
+  return Boolean(normalize(state.entrySearch.firstName) || normalize(state.entrySearch.lastName) || normalize(state.entrySearch.dni));
+}
+
+function getEntrySearchResults() {
+  const firstName = normalize(state.entrySearch.firstName);
+  const lastName = normalize(state.entrySearch.lastName);
+  const dni = normalize(state.entrySearch.dni).replace(/\s/g, "");
+  if (!firstName && !lastName && !dni) return [];
+  return state.attendees.filter((person) => {
+    const name = normalize(person.fullName);
+    const personDni = normalize(person.dni).replace(/\s/g, "");
+    if (firstName && !name.includes(firstName)) return false;
+    if (lastName && !name.includes(lastName)) return false;
+    if (dni && !personDni.includes(dni)) return false;
+    return true;
+  });
+}
+
+function renderEntryRows(results) {
+  if (!results.length) return `<div class="empty-state">No hay participantes con esos datos.</div>`;
+  return `
+    <div class="entry-table">
+      ${results.map(renderEntryRow).join("")}
+    </div>
+  `;
+}
+
+function renderEntryRow(person) {
+  return `
+    <article class="entry-row">
+      <div>
+        <h3>${escapeHtml(person.fullName)} ${isMinor(person.birthDate) ? `<span class="badge minor">MENOR DE EDAD</span>` : ""}</h3>
+        <p class="muted">DNI ${escapeHtml(person.dni)} · ${escapeHtml(person.category)} · ${escapeHtml(person.accreditation || "Sin acreditacion")}</p>
+      </div>
+      <label class="check-field">
+        <input type="checkbox" data-entry-field="rehearsal01" data-entry-id="${person.id}" ${person.rehearsal01 ? "checked" : ""} />
+        <span>ENSAYO 01</span>
+      </label>
+      <label class="check-field">
+        <input type="checkbox" data-entry-field="rehearsal02" data-entry-id="${person.id}" ${person.rehearsal02 ? "checked" : ""} />
+        <span>ENSAYO 02</span>
+      </label>
+      <label class="field compact-field">
+        <span>Entrada</span>
+        <select data-ticket-status="${person.id}">
+          ${["ACREDITADO", "ENTRADA", "ENTRADA ASIGNADA"]
+            .map((status) => `<option value="${status}" ${person.ticketStatus === status ? "selected" : ""}>${status}</option>`)
+            .join("")}
+        </select>
+      </label>
+    </article>
+  `;
+}
+
+function renderReports() {
+  const rows = getReportRows();
+  return `
+    <section class="panel">
+      <div class="panel-title">
+        <div>
+          <h2>Registros de eventos</h2>
+          <p>Descarga los check-ins y consulta quien los ha realizado.</p>
+        </div>
+        <button class="btn primary" id="downloadCheckinsBtn" type="button">Descargar CSV</button>
+      </div>
+      <label class="field">
+        <span>Evento</span>
+        <select id="reportEventFilter">
+          <option value="">Todos los eventos</option>
+          ${state.events
+            .map((event) => `<option value="${event.id}" ${state.reports.selectedEventId === event.id ? "selected" : ""}>${escapeHtml(event.name)} - ${escapeHtml(event.date)}</option>`)
+            .join("")}
+        </select>
+      </label>
+      <div class="report-table">
+        ${rows.length ? rows.slice(0, 80).map(renderReportRow).join("") : `<div class="empty-state">No hay check-ins para este filtro.</div>`}
+      </div>
+    </section>
+    <section class="panel">
+      <div class="panel-title">
+        <div>
+          <h2>Comparar lista</h2>
+          <p>Sube o pega una lista de nombres/DNI para ver cuales no estan en la base.</p>
+        </div>
+        <button class="btn ghost" id="downloadMissingBtn" type="button" ${state.reports.missingNames.length ? "" : "disabled"}>Descargar no encontrados</button>
+      </div>
+      <label class="field">
+        <span>Subir lista CSV/TXT</span>
+        <input id="compareFileInput" type="file" accept=".csv,.txt" />
+      </label>
+      <label class="field">
+        <span>O pegar lista</span>
+        <textarea id="compareListInput" rows="7" placeholder="Un nombre o DNI por linea">${escapeHtml(state.reports.compareRaw)}</textarea>
+      </label>
+      <button class="btn primary" id="compareListBtn" type="button">Buscar nombres que NO ESTAN</button>
+      <div class="missing-list">
+        ${state.reports.missingNames.length ? state.reports.missingNames.map((name) => `<div class="admin-item"><strong>${escapeHtml(name)}</strong></div>`).join("") : `<div class="empty-state">Aun no hay resultados de comparacion.</div>`}
+      </div>
+    </section>
+  `;
+}
+
+function getReportRows() {
+  const rows = [];
+  const usersById = Object.fromEntries(state.users.map((user) => [user.id, user]));
+  const eventsById = Object.fromEntries(state.events.map((event) => [event.id, event]));
+  state.attendees.forEach((person) => {
+    Object.entries(person.checkins || {}).forEach(([eventId, checkin]) => {
+      if (state.reports.selectedEventId && eventId !== state.reports.selectedEventId) return;
+      rows.push({
+        event: eventsById[eventId]?.name || eventId,
+        eventDate: eventsById[eventId]?.date || "",
+        attendee: person.fullName,
+        dni: person.dni,
+        category: person.category,
+        checkedAt: checkin.iso || checkin.time || "",
+        checkedBy: usersById[checkin.by]?.name || checkin.byName || checkin.by || "",
+      });
+    });
+  });
+  return rows.sort((a, b) => String(b.checkedAt).localeCompare(String(a.checkedAt)));
+}
+
+function renderReportRow(row) {
+  return `
+    <article class="admin-item">
+      <div>
+        <h3>${escapeHtml(row.attendee)} <span class="badge category">${escapeHtml(row.category)}</span></h3>
+        <p class="muted">DNI ${escapeHtml(row.dni)} · ${escapeHtml(row.event)} · ${escapeHtml(row.eventDate)}</p>
+      </div>
+      <div>
+        <strong>${escapeHtml(row.checkedBy || "Sin usuario")}</strong>
+        <p class="muted">${escapeHtml(formatDate(row.checkedAt) || row.checkedAt)}</p>
+      </div>
+    </article>
+  `;
 }
 
 function renderPersonCard(person) {
@@ -787,6 +1052,7 @@ function renderAdminAttendee(person) {
 
 function renderUsersAdmin() {
   const volunteers = state.users.filter((user) => user.role === "volunteer");
+  const supervisors = state.users.filter((user) => user.role === "supervisor");
   const admins = state.users.filter((user) => user.role === "admin");
   return `
     <section class="admin-grid">
@@ -794,7 +1060,7 @@ function renderUsersAdmin() {
         <div class="panel-title">
           <div>
             <h2>Crear usuario</h2>
-            <p>Los administradores pueden crear voluntarios y otros administradores.</p>
+            <p>Los administradores pueden crear voluntarios, supervisores y otros administradores.</p>
           </div>
         </div>
         <label class="field"><span>Nombre</span><input name="name" required /></label>
@@ -804,6 +1070,7 @@ function renderUsersAdmin() {
           <span>Rol</span>
           <select name="role">
             <option value="volunteer">Voluntario</option>
+            <option value="supervisor">Supervisor</option>
             <option value="admin">Administrador</option>
           </select>
         </label>
@@ -813,7 +1080,7 @@ function renderUsersAdmin() {
         <div class="panel-title">
           <div>
             <h2>Usuarios</h2>
-            <p>${admins.length} administradores · ${volunteers.length} voluntarios.</p>
+            <p>${admins.length} administradores · ${supervisors.length} supervisores · ${volunteers.length} voluntarios.</p>
           </div>
         </div>
         <div class="admin-list">
@@ -822,7 +1089,7 @@ function renderUsersAdmin() {
               (user) => `
                 <article class="admin-item">
                   <div>
-                    <h3>${escapeHtml(user.name)} <span class="badge category">${user.role === "admin" ? "Administrador" : "Voluntario"}</span></h3>
+                    <h3>${escapeHtml(user.name)} <span class="badge category">${escapeHtml(roleLabel(user.role))}</span></h3>
                     <p class="muted">${escapeHtml(user.email)}</p>
                   </div>
                   <button class="btn danger" data-delete-user="${user.id}" type="button">Borrar</button>
@@ -897,12 +1164,20 @@ function bindEvents() {
 
   byId("dniSearch")?.addEventListener("input", updateSearchResults);
   byId("nameSearch")?.addEventListener("input", updateSearchResults);
+  byId("entryFirstNameSearch")?.addEventListener("input", updateEntrySearch);
+  byId("entryLastNameSearch")?.addEventListener("input", updateEntrySearch);
+  byId("entryDniSearch")?.addEventListener("input", updateEntrySearch);
   byId("attendeeForm")?.addEventListener("submit", handleAttendeeSave);
   byId("userForm")?.addEventListener("submit", handleUserSave);
   byId("eventForm")?.addEventListener("submit", handleEventSave);
   byId("adminCategoryFilter")?.addEventListener("change", updateAdminFilters);
   byId("adminSourceFilter")?.addEventListener("change", updateAdminFilters);
   byId("adminCreatedDateFilter")?.addEventListener("change", updateAdminFilters);
+  byId("reportEventFilter")?.addEventListener("change", updateReportFilter);
+  byId("downloadCheckinsBtn")?.addEventListener("click", downloadCheckinsCsv);
+  byId("compareListBtn")?.addEventListener("click", compareList);
+  byId("downloadMissingBtn")?.addEventListener("click", downloadMissingCsv);
+  byId("compareFileInput")?.addEventListener("change", handleCompareFile);
   byId("cancelEditBtn")?.addEventListener("click", () => {
     editingAttendeeId = null;
     render();
@@ -931,6 +1206,12 @@ function bindEvents() {
   });
   document.querySelectorAll("[data-clear-active-event]").forEach((button) => {
     button.addEventListener("click", () => activateEvent(""));
+  });
+  document.querySelectorAll("[data-entry-field]").forEach((input) => {
+    input.addEventListener("change", () => updateEntryField(input.dataset.entryId, input.dataset.entryField, input.checked));
+  });
+  document.querySelectorAll("[data-ticket-status]").forEach((select) => {
+    select.addEventListener("change", () => updateEntryField(select.dataset.ticketStatus, "ticketStatus", select.value));
   });
 }
 
@@ -980,8 +1261,8 @@ async function handleLogin(event) {
   try {
     const session = await signInWithSupabase(rawEmail, password);
     state.currentUserId = session.user.id;
-    state.activeTab = "checkin";
     await loadCloudData();
+    setDefaultTabForUser();
     saveState();
     render();
     showToast("Sesion iniciada con Supabase.");
@@ -1013,6 +1294,116 @@ function updateSearchResults() {
   document.querySelectorAll("[data-checkin]").forEach((button) => {
     button.addEventListener("click", () => toggleCheckin(button.dataset.checkin));
   });
+}
+
+function updateEntrySearch() {
+  state.entrySearch.firstName = byId("entryFirstNameSearch")?.value || "";
+  state.entrySearch.lastName = byId("entryLastNameSearch")?.value || "";
+  state.entrySearch.dni = byId("entryDniSearch")?.value || "";
+  saveState();
+  render();
+}
+
+function updateReportFilter() {
+  state.reports.selectedEventId = byId("reportEventFilter")?.value || "";
+  saveState();
+  render();
+}
+
+async function updateEntryField(attendeeId, field, value) {
+  const person = state.attendees.find((item) => item.id === attendeeId);
+  if (!person) return;
+  person[field] = value;
+  saveState();
+
+  const cloudField = {
+    rehearsal01: "rehearsal_01",
+    rehearsal02: "rehearsal_02",
+    ticketStatus: "ticket_status",
+  }[field];
+
+  if (isCloudUser() && cloudField) {
+    try {
+      await supabaseRequest(`/rest/v1/attendees?id=eq.${encodeURIComponent(attendeeId)}`, {
+        method: "PATCH",
+        headers: { Prefer: "return=minimal" },
+        body: JSON.stringify({ [cloudField]: value }),
+      });
+      showToast("Registro actualizado.");
+    } catch (error) {
+      console.warn(error);
+      showToast("No se pudo actualizar en Supabase.");
+    }
+  }
+}
+
+function csvEscape(value) {
+  return `"${String(value ?? "").replaceAll('"', '""')}"`;
+}
+
+function downloadCsv(filename, rows) {
+  const csv = rows.map((row) => row.map(csvEscape).join(",")).join("\n");
+  const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = filename;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  URL.revokeObjectURL(url);
+}
+
+function downloadCheckinsCsv() {
+  const rows = getReportRows();
+  downloadCsv("registros-checkin.csv", [
+    ["Evento", "Fecha evento", "Asistente", "DNI", "Categoria", "Check-in", "Registrado por"],
+    ...rows.map((row) => [row.event, row.eventDate, row.attendee, row.dni, row.category, row.checkedAt, row.checkedBy]),
+  ]);
+}
+
+function parseCompareLines(text) {
+  return String(text || "")
+    .split(/\r?\n/)
+    .map((line) => line.split(/[;,]/).map((part) => part.trim()).filter(Boolean).join(" "))
+    .map((line) => line.trim())
+    .filter(Boolean);
+}
+
+function compareList() {
+  const raw = byId("compareListInput")?.value || "";
+  const lines = parseCompareLines(raw);
+  const attendeesIndex = state.attendees.map((person) => ({
+    fullName: normalize(person.fullName),
+    dni: normalize(person.dni).replace(/\s/g, ""),
+  }));
+
+  state.reports.compareRaw = raw;
+  state.reports.missingNames = lines.filter((line) => {
+    const normalized = normalize(line);
+    const dni = normalized.replace(/\s/g, "");
+    return !attendeesIndex.some((person) => person.fullName.includes(normalized) || normalized.includes(person.fullName) || (dni && person.dni === dni));
+  });
+  saveState();
+  render();
+  showToast(`${state.reports.missingNames.length} nombres no encontrados.`);
+}
+
+function downloadMissingCsv() {
+  downloadCsv("nombres-no-encontrados.csv", [["Nombre o DNI"], ...state.reports.missingNames.map((name) => [name])]);
+}
+
+function handleCompareFile(event) {
+  const file = event.target.files?.[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = () => {
+    state.reports.compareRaw = String(reader.result || "");
+    saveState();
+    render();
+    showToast("Lista cargada. Pulsa comparar para buscar ausentes.");
+  };
+  reader.readAsText(file);
 }
 
 async function toggleCheckin(attendeeId) {
@@ -1133,6 +1524,9 @@ function toCloudAttendee(person) {
     email: person.email,
     birth_date: person.birthDate || null,
     accreditation: person.accreditation,
+    rehearsal_01: Boolean(person.rehearsal01),
+    rehearsal_02: Boolean(person.rehearsal02),
+    ticket_status: person.ticketStatus || "ACREDITADO",
     phone: person.phone,
     notes: person.notes,
   };
@@ -1149,7 +1543,7 @@ async function handleUserSave(event) {
     name: String(form.get("name") || "").trim(),
     email,
     password: String(form.get("password") || ""),
-    role: role === "admin" ? "admin" : "volunteer",
+    role: ["admin", "supervisor", "volunteer"].includes(role) ? role : "volunteer",
   };
 
   if (currentUser()?.role !== "admin") {
@@ -1167,16 +1561,7 @@ async function handleUserSave(event) {
     return;
   }
 
-  state.users.push({
-    id: crypto.randomUUID(),
-    name: payload.name,
-    email: payload.email,
-    password: payload.password,
-    role: payload.role,
-  });
-  saveState();
-  render();
-  showToast("Usuario creado.");
+  showToast("No se puede crear usuario sin conexion a Supabase.");
 }
 
 async function createCloudUser(payload) {
@@ -1261,6 +1646,7 @@ async function initApp() {
   if (cloudSession?.access_token) {
     state.currentUserId = cloudSession.user.id;
     await tryCloudSync();
+    setDefaultTabForUser();
   } else {
     state.currentUserId = null;
     cloudReady = false;

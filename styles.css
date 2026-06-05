@@ -469,6 +469,60 @@ textarea:focus {
   gap: 14px;
 }
 
+.entry-search-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.entry-list,
+.entry-table,
+.report-table,
+.missing-list {
+  display: grid;
+  gap: 10px;
+}
+
+.entry-row {
+  display: grid;
+  grid-template-columns: minmax(240px, 1fr) auto auto minmax(190px, 0.5fr);
+  gap: 12px;
+  align-items: center;
+  padding: 14px;
+  background: #fff;
+  border: 1px solid var(--line);
+  border-left: 6px solid var(--violet);
+  border-radius: var(--radius);
+  box-shadow: 0 12px 28px rgba(23, 32, 51, 0.08);
+}
+
+.entry-row h3 {
+  margin: 0 0 5px;
+  font-size: 17px;
+}
+
+.check-field {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 42px;
+  padding: 8px 10px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: #f8fbff;
+  font-weight: 900;
+  white-space: nowrap;
+}
+
+.check-field input {
+  width: 18px;
+  height: 18px;
+}
+
+.compact-field {
+  margin: 0;
+}
+
 .filters-grid {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(0, 0.8fr) minmax(0, 0.8fr);
@@ -649,6 +703,8 @@ textarea:focus {
   .layout,
   .admin-grid,
   .search-grid,
+  .entry-search-grid,
+  .entry-row,
   .filters-grid,
   .event-strip {
     grid-template-columns: 1fr;

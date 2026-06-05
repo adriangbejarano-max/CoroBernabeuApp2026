@@ -52,7 +52,7 @@ Deno.serve(async (req) => {
   const email = String(body.email || "").trim().toLowerCase();
   const password = String(body.password || "");
   const fullName = String(body.name || "").trim();
-  const role = body.role === "admin" ? "admin" : "volunteer";
+  const role = ["admin", "supervisor", "volunteer"].includes(body.role) ? body.role : "volunteer";
 
   if (!email || !password || !fullName) {
     return json({ error: "Missing name, email or password" }, 400);

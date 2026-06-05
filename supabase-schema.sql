@@ -4,7 +4,7 @@ create table if not exists public.profiles (
   id uuid primary key references auth.users(id) on delete cascade,
   full_name text not null,
   email text not null default '',
-  role text not null check (role in ('admin', 'volunteer')),
+  role text not null check (role in ('admin', 'supervisor', 'volunteer')),
   created_at timestamptz not null default now()
 );
 
@@ -26,6 +26,9 @@ create table if not exists public.attendees (
   birth_date date,
   accreditation text not null default '',
   source text not null default 'manual' check (source in ('manual', 'excel')),
+  rehearsal_01 boolean not null default false,
+  rehearsal_02 boolean not null default false,
+  ticket_status text not null default 'ACREDITADO' check (ticket_status in ('ACREDITADO', 'ENTRADA', 'ENTRADA ASIGNADA')),
   phone text not null default '',
   notes text not null default '',
   created_at timestamptz not null default now()
@@ -35,6 +38,9 @@ alter table public.attendees add column if not exists email text not null defaul
 alter table public.attendees add column if not exists birth_date date;
 alter table public.attendees add column if not exists accreditation text not null default '';
 alter table public.attendees add column if not exists source text not null default 'manual';
+alter table public.attendees add column if not exists rehearsal_01 boolean not null default false;
+alter table public.attendees add column if not exists rehearsal_02 boolean not null default false;
+alter table public.attendees add column if not exists ticket_status text not null default 'ACREDITADO';
 
 create table if not exists public.checkins (
   id uuid primary key default gen_random_uuid(),
@@ -62,6 +68,37 @@ as $$
     from public.profiles
     where id = auth.uid()
       and role = 'admin'
+  );
+$$;
+
+do $$
+begin
+  if exists (
+    select 1
+    from information_schema.table_constraints
+    where constraint_schema = 'public'
+      and table_name = 'profiles'
+      and constraint_name = 'profiles_role_check'
+  ) then
+    alter table public.profiles drop constraint profiles_role_check;
+  end if;
+end $$;
+
+alter table public.profiles
+add constraint profiles_role_check
+check (role in ('admin', 'supervisor', 'volunteer'));
+
+create or replace function public.is_admin_or_supervisor()
+returns boolean
+language sql
+security definer
+set search_path = public
+as $$
+  select exists (
+    select 1
+    from public.profiles
+    where id = auth.uid()
+      and role in ('admin', 'supervisor')
   );
 $$;
 
@@ -121,6 +158,13 @@ on public.attendees for all
 to authenticated
 using (public.is_admin())
 with check (public.is_admin());
+
+drop policy if exists "attendees_update_supervisor" on public.attendees;
+create policy "attendees_update_supervisor"
+on public.attendees for update
+to authenticated
+using (public.is_admin_or_supervisor())
+with check (public.is_admin_or_supervisor());
 
 drop policy if exists "checkins_select_authenticated" on public.checkins;
 create policy "checkins_select_authenticated"
