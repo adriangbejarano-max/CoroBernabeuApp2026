@@ -739,10 +739,16 @@ function renderEntryCheckin() {
         </label>
       </div>
     </section>
-    <section class="entry-list">
-      ${hasEntrySearch() ? renderEntryRows(results) : `<div class="empty-state search-empty"><strong>Busca para ver participantes</strong><span>No se muestra ningun registro hasta introducir nombre, apellido o DNI.</span></div>`}
+    <section class="entry-list" id="entryResults">
+      ${renderEntryResults(results)}
     </section>
   `;
+}
+
+function renderEntryResults(results = getEntrySearchResults()) {
+  return hasEntrySearch()
+    ? renderEntryRows(results)
+    : `<div class="empty-state search-empty"><strong>Busca para ver participantes</strong><span>No se muestra ningun registro hasta introducir nombre, apellido o DNI.</span></div>`;
 }
 
 function hasEntrySearch() {
@@ -1185,6 +1191,10 @@ function bindEvents() {
   document.querySelectorAll("[data-clear-active-event]").forEach((button) => {
     button.addEventListener("click", () => activateEvent(""));
   });
+  bindEntryControls();
+}
+
+function bindEntryControls() {
   document.querySelectorAll("[data-entry-field]").forEach((input) => {
     input.addEventListener("change", () => updateEntryField(input.dataset.entryId, input.dataset.entryField, input.checked));
   });
@@ -1279,7 +1289,8 @@ function updateEntrySearch() {
   state.entrySearch.lastName = byId("entryLastNameSearch")?.value || "";
   state.entrySearch.dni = byId("entryDniSearch")?.value || "";
   saveState();
-  render();
+  byId("entryResults").innerHTML = renderEntryResults();
+  bindEntryControls();
 }
 
 function updateReportFilter() {
