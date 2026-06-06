@@ -74,12 +74,12 @@ def find_column(df, contains):
     return None
 
 
-def row_values(row, index, accreditation_column):
+def row_values(row, index, accreditation_column, id_key=None):
     dni = clean(row.get("DNI")).upper()
     name = " ".join([clean(row.get("NOMBRE")), clean(row.get("APELLIDOS"))]).strip()
     if not name:
         return None
-    attendee_id = uuid.uuid5(NAMESPACE, f"{dni}|{name}")
+    attendee_id = uuid.uuid5(NAMESPACE, id_key or f"{dni}|{name}")
     cargo = clean(row.get("CARGO"))
     group = clean(row.get("Parroquia, colegio, movimiento al que perteneces\n"))
     accreditation = first_existing(row, ["ACREDITACIÓN", "ZONA", accreditation_column])
@@ -216,11 +216,46 @@ def generate_incremental_import(df, input_path, output):
     print(f"Generated {output} with {len(values)} attendees ({duplicates} duplicate rows skipped)")
 
 
+def generate_append_import(df, input_path, output):
+    accreditation_column = find_column(df, ["ACREDIT"])
+    values = []
+    for index, row in df.iterrows():
+        item = row_values(row, index, accreditation_column, id_key=f"{input_path.name}|row:{index + 2}")
+        if item:
+            values.append(item["sql"])
+
+    lines = [
+        f"-- Importacion append generada desde {input_path.name}",
+        "-- No borra asistentes ni check-ins.",
+        "-- Inserta una ficha por cada fila valida del Excel, sin deduplicar.",
+        "-- Si se ejecuta de nuevo, actualiza esas mismas filas por id estable de archivo+fila.",
+        "begin;",
+        "insert into public.attendees (id, dni, full_name, category, group_name, email, birth_date, accreditation, source, phone, notes)",
+        "values",
+        ",\n".join(values),
+        "on conflict (id) do update set",
+        "  dni = excluded.dni,",
+        "  full_name = excluded.full_name,",
+        "  category = excluded.category,",
+        "  group_name = excluded.group_name,",
+        "  email = excluded.email,",
+        "  birth_date = excluded.birth_date,",
+        "  accreditation = excluded.accreditation,",
+        "  source = excluded.source,",
+        "  phone = excluded.phone,",
+        "  notes = excluded.notes;",
+        "commit;",
+        "",
+    ]
+    output.write_text("\n".join(lines), encoding="utf-8")
+    print(f"Generated {output} with {len(values)} attendee rows")
+
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--input", default=str(INPUT))
     parser.add_argument("--output", default=str(OUTPUT))
-    parser.add_argument("--mode", choices=["full", "incremental"], default="full")
+    parser.add_argument("--mode", choices=["full", "incremental", "append"], default="full")
     args = parser.parse_args()
 
     input_path = Path(args.input)
@@ -228,6 +263,8 @@ def main():
     df = pd.read_excel(input_path)
     if args.mode == "incremental":
         generate_incremental_import(df, input_path, output_path)
+    elif args.mode == "append":
+        generate_append_import(df, input_path, output_path)
     else:
         generate_full_import(df, input_path, output_path)
 
